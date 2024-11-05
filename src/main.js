@@ -3,8 +3,12 @@ import App from "./App.vue";
 import VNetworkGraph from "v-network-graph";
 import "v-network-graph/lib/style.css";
 
+// Importa primero el CSS de Bootstrap
 import "bootstrap/dist/css/bootstrap.min.css";
-// Importa el JavaScript de Bootstrap
+// Luego importa tus personalizaciones para que sobrescriban el CSS de Bootstrap
+import "./assets/custom-bootstrap.scss";
+
+// Importa el JavaScript de Bootstrap (si necesitas componentes de Bootstrap que requieren JS)
 import "bootstrap/dist/js/bootstrap.bundle.min.js";
 
 const app = createApp(App);

@@ -1,5 +1,6 @@
 <script setup lang="ts">
     import { reactive, ref } from "vue";
+    import * as vNG from "v-network-graph";
     import { VNetworkGraph } from "v-network-graph";
     import data from "./data";
 
@@ -11,21 +12,35 @@
     const selectedEdges = ref<string[]>([]);
     const newNodeName = ref<string>("");
 
-    function addNode() {
+    // Extrae la configuración desde el objeto de datos
+    const configs = reactive({
+        node: data.configs.node,
+        edge: data.configs.edge,
+        view: {
+            panEnabled: true, // Permite hacer pan (arrastrar el gráfico completo)
+            zoomEnabled: false, // Deshabilita el zoom
+            zoomMin: 0.5, // Nivel mínimo de zoom
+            zoomMax: 1, // Nivel máximo de zoom
+            backgroundColor: "red", // Color de fondo del gráfico
+        },
+    });
+
+    // Funciones para agregar y eliminar nodos y aristas...
+    const addNode = () => {
         const nodeId = `node${nextNodeIndex.value}`;
         const name = `N${nextNodeIndex.value}`;
         nodes[nodeId] = { name };
         nextNodeIndex.value++;
-    }
+    };
 
-    function removeNode() {
+    const removeNode = () => {
         for (const nodeId of selectedNodes.value) {
             delete nodes[nodeId];
         }
         selectedNodes.value = [];
-    }
+    };
 
-    function addEdge() {
+    const addEdge = () => {
         if (selectedNodes.value.length !== 2) {
             alert("Por favor selecciona exactamente dos nodos para crear una arista.");
             return;
@@ -34,13 +49,13 @@
         const edgeId = `edge${nextEdgeIndex.value}`;
         edges[edgeId] = { source, target };
         nextEdgeIndex.value++;
-    }
+    };
 
-    function removeEdge() {
+    const removeEdge = () => {
         for (const edgeId of selectedEdges.value) {
             delete edges[edgeId];
         }
-    }
+    };
 
     const updateNodeName = () => {
         if (selectedNodes.value.length === 1) {
@@ -55,52 +70,63 @@
 
 <template>
     <div class="container mt-5">
-        <div class="row mb-3">
-            <div class="col">
-                <label class="form-label">Nodo:</label>
-                <button class="btn btn-primary btn-sm mx-1" @click="addNode">Añadir Nodo</button>
-                <button
-                    class="btn btn-danger btn-sm mx-1"
-                    :disabled="selectedNodes.length === 0"
-                    @click="removeNode">
-                    Eliminar Nodo
-                </button>
-                <!-- <div v-if="selectedNodes.length === 1" class="mt-2">
-                    <input
-                        type="text"
-                        v-model="newNodeName"
-                        @input="updateNodeName"
-                        placeholder="Cambiar nombre del nodo"
-                        class="form-control form-control-sm" />
-                </div> -->
+        <div class="card p-3 mb-4 shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h6 class="m-0">Panel de Acciones</h6>
             </div>
-            <div class="col">
-                <label class="form-label">Arista:</label>
-                <button
-                    class="btn btn-primary btn-sm mx-1"
-                    :disabled="selectedNodes.length !== 2"
-                    @click="addEdge">
-                    Añadir Arista
-                </button>
-                <button
-                    class="btn btn-danger btn-sm mx-1"
-                    :disabled="selectedEdges.length === 0"
-                    @click="removeEdge">
-                    Eliminar Arista
-                </button>
-            </div>
-            <div class="col">
-                <input
-                    type="text"
-                    v-model="newNodeName"
-                    class="form-control form-control-sm"
-                    placeholder="Renombrar Nodo" />
-                <button
-                    class="btn btn-secondary btn-sm mt-2"
-                    @click="updateNodeName"
-                    :disabled="selectedNodes.length !== 1">
-                    Cambiar Nombre
-                </button>
+            <div class="card-body">
+                <div class="row gy-3">
+                    <!-- Sección de acciones de Nodo -->
+                    <div class="col-md-4 d-flex flex-column align-items-start">
+                        <h6 class="text-primary">Nodo</h6>
+                        <div class="btn-group">
+                            <button class="btn btn-primary btn-sm" @click="addNode">
+                                Añadir Nodo
+                            </button>
+                            <button
+                                class="btn btn-outline-danger btn-sm"
+                                :disabled="selectedNodes.length === 0"
+                                @click="removeNode">
+                                Eliminar Nodo
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Sección de acciones de Arista -->
+                    <div class="col-md-4 d-flex flex-column align-items-start">
+                        <h6 class="text-primary">Arista</h6>
+                        <div class="btn-group">
+                            <button
+                                class="btn btn-primary btn-sm"
+                                :disabled="selectedNodes.length !== 2"
+                                @click="addEdge">
+                                Añadir Arista
+                            </button>
+                            <button
+                                class="btn btn-outline-danger btn-sm"
+                                :disabled="selectedEdges.length === 0"
+                                @click="removeEdge">
+                                Eliminar Arista
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Sección de cambio de nombre de nodo -->
+                    <div class="col-md-4">
+                        <h6 class="text-primary">Renombrar Nodo</h6>
+                        <div class="input-group input-group-sm">
+                            <input
+                                type="text"
+                                v-model="newNodeName"
+                                class="form-control"
+                                placeholder="Nombre del Nodo" />
+                            <button
+                                class="btn btn-outline-secondary"
+                                @click="updateNodeName"
+                                :disabled="selectedNodes.length !== 1">
+                                Cambiar Nombre
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -111,12 +137,12 @@
                 :nodes="nodes"
                 :edges="edges"
                 :layouts="data.layouts"
-                :configs="data.configs" />
+                :configs="configs" />
         </div>
 
         <div class="mt-5 mb-5">
             <h1>Descripción</h1>
-            <table class="dictionary">
+            <table class="dictionary bg-primary">
                 <thead>
                     <tr>
                         <th>Elemento</th>
@@ -129,26 +155,20 @@
                             <div class="circle"></div>
                             Nodo
                         </td>
-                        <td>
-                            Un nodo representa un punto en el gráfico. Puede ser un objeto, una
-                            entidad o cualquier elemento que desees visualizar.
-                        </td>
+                        <td>Un nodo representa un punto en el gráfico.</td>
                     </tr>
                     <tr>
                         <td>
                             <div class="line"></div>
                             Arista
                         </td>
-                        <td>
-                            Una conexión (o arista) representa la relación entre dos nodos. Se
-                            utiliza para mostrar interacciones o vínculos.
-                        </td>
+                        <td>Una conexión (o arista) representa la relación entre dos nodos.</td>
                     </tr>
                     <tr>
                         <td>D3-Force</td>
                         <td>
                             Permite que los nodos se distribuyan de manera que la visualización sea
-                            más clara y comprensible.
+                            más clara.
                         </td>
                     </tr>
                 </tbody>
@@ -182,7 +202,6 @@
         text-align: left;
     }
     .dictionary th {
-        background-color: #007bff;
         color: white;
     }
     .dictionary td {
@@ -198,7 +217,7 @@
     }
     .line {
         width: 40px; /* Ajusta la longitud de la línea */
-        height: 2px; /* Ajusta el grosor de la línea */
+        height: 1px; /* Ajusta el grosor de la línea */
         background-color: #007bff;
         display: inline-block;
         margin-right: 8px;

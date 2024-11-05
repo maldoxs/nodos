@@ -21,36 +21,43 @@ const layouts: Layouts = {
 
 
 const configs = defineConfigs({
-  node: {
-        selectable: 2, // Permite seleccionar hasta 2 nodos a la vez
-        label: { // Configuración de la etiqueta del nodo
-        fontSize: 15, // Tamaño de la fuente de la etiqueta
-        color: "RED", // Color del texto
-        fontWeight: "bold", // Peso de la fuente: 'normal', 'bold', etc.
-        fontFamily: "Arial", // Tipo de letra
-        textAlign: "left", // Alineación del texto: 'left', 'center', 'right'
-        textDecoration: "line-through", // Decoración del texto: 'none', 'underline', 'line-through'
-    },
-    size: { // Configuración del tamaño del nodo
-        width: 700, // Ancho del nodo
-        height: 700, // Alto del nodo
+node: {
+    selectable: 2, // Permite seleccionar hasta 2 nodos a la vez
+    label: { // Configuración de la etiqueta del nodo
+            fontSize: 15, // Tamaño de la fuente de la etiqueta
+            color: "black", // Color del texto
+            fontWeight: "bold", // Peso de la fuente: 'normal', 'bold', etc.
+            fontFamily: "Arial", // Tipo de letra
+            textAlign: "left", // Alineación del texto: 'left', 'center', 'right'
+            textDecoration: "line-through", // Decoración del texto: 'none', 'underline', 'line-through'
+            visible: true,
+            direction: "south",
+            directionAutoAdjustment: true, // Reubica la etiqueta si hay obstrucciones
         },
+      normal: {
+            radius: 20,
+            color: "#0d6efd",
+            //strokeWidth: 1,
+            //strokeColor: "#ec540c",
+        },
+       hover: {
+            color: "#0d6efd",
+       },
     shape: "square", // Forma del nodo: 'circle', 'square', 'rectangle', etc.
-    color: "lightblue", // Color de fondo del nodo
-    border: { // Configuración del borde del nodo
-        width: 2, // Ancho del borde
-        color: "black", // Color del borde
-        style: "solid", // Estilo del borde: 'solid', 'dashed', 'dotted'
-        },
-     opacity: 0.8, // Opacidad del nodo: 0 (transparente) a 1 (opaco)
+    color: "orange", // Color de fondo del nodo (cambiado a naranja)
+    // border: { // Configuración del borde del nodo
+    //         width: 1, // Ancho del borde
+    //         color: "black", // Color del borde
+    //         style: "dashed", // Estilo del borde: 'solid', 'dashed', 'dotted'
+    // },
+    opacity: 0.8, // Opacidad del nodo: 0 (transparente) a 1 (opaco)
     image: "url/to/image.png", // URL de una imagen para usar como fondo del nodo
     tooltip: { // Configuración del tooltip (información sobre herramientas)
         text: "Información adicional", // Texto que se muestra en el tooltip
         showOnHover: true, // Muestra el tooltip al pasar el ratón
     },
+},
 
-
-  },
   edge: {
       selectable: true, // Permite seleccionar aristas
        label: { // Configuración de la etiqueta de la arista
@@ -59,7 +66,8 @@ const configs = defineConfigs({
         position: "start", // Posición de la etiqueta (start, middle, end)
     },
     normal: {
-      width: 3, // Ancho de las aristas
+        width: 1, // Ancho de las aristas
+        //color:"#0464a4"
       },
 
     },
