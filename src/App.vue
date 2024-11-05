@@ -1,82 +1,63 @@
 <script setup lang="ts">
-    import { reactive, ref, watch, computed } from "vue";
+    import { reactive, ref, watch } from "vue";
     import { VNetworkGraph } from "v-network-graph";
-    import "v-network-graph/lib/style.css";
-    import { ForceLayout } from "v-network-graph/lib/force-layout";
     import data from "./data"; // Importa los datos de configuración
 
-    // Configuración inicial para nodos y aristas
     const nodes = reactive({ ...data.nodes });
     const edges = reactive({ ...data.edges });
-    const layouts = ref(data.layouts);
-
-    // Extrae la configuración desde el objeto de datos
-    const configs = reactive({
-        node: data.configs.node,
-        edge: data.configs.edge,
-        view: {
-            layoutHandler: new ForceLayout(), // Inicializa con ForceLayout
-            panEnabled: true, // Permite hacer pan (arrastrar el gráfico completo)
-            zoomEnabled: false, // Permite hacer zoom
-            zoomMin: 0.5, // Nivel mínimo de zoom
-            zoomMax: 1, // Nivel máximo de zoom
-            backgroundColor: "#f8f9fa", // Color de fondo del gráfico
-        },
-    });
-
-    // Índices para el próximo nodo y arista
     const nextNodeIndex = ref(Object.keys(nodes).length + 1);
     const nextEdgeIndex = ref(Object.keys(edges).length + 1);
-
-    // Selección de nodos y aristas
     const selectedNodes = ref<string[]>([]);
     const selectedEdges = ref<string[]>([]);
+    const newNodeName = ref<string>(""); // Nuevo nombre para el nodo
 
-    // Estado para habilitar el diseño forzado
-    const d3ForceEnabled = ref(false);
-
-    // Computed para manejar el diseño
-    watch(d3ForceEnabled, (value) => {
-        configs.view.layoutHandler = value ? new ForceLayout() : new vNG.SimpleLayout();
-    });
-
-    // Función para agregar un nodo
-    const addNode = () => {
+    // Funciones para manejar nodos
+    function addNode() {
         const nodeId = `node${nextNodeIndex.value}`;
-        nodes[nodeId] = { name: `N${nextNodeIndex.value}` };
+        const name = `N${nextNodeIndex.value}`;
+        nodes[nodeId] = { name };
         nextNodeIndex.value++;
-    };
+    }
 
-    // Función para eliminar nodos seleccionados
-    const removeNode = () => {
-        selectedNodes.value.forEach((nodeId) => delete nodes[nodeId]);
-    };
-
-    // Función para agregar una arista entre dos nodos seleccionados
-    const addEdge = () => {
-        if (selectedNodes.value.length === 2) {
-            const [source, target] = selectedNodes.value;
-            edges[`edge${nextEdgeIndex.value}`] = { source, target };
-            nextEdgeIndex.value++;
+    function removeNode() {
+        for (const nodeId of selectedNodes.value) {
+            delete nodes[nodeId];
         }
-    };
+        selectedNodes.value = []; // Limpiar selección después de eliminar
+    }
 
-    // Función para eliminar aristas seleccionadas
-    const removeEdge = () => {
-        selectedEdges.value.forEach((edgeId) => delete edges[edgeId]);
-    };
+    function updateNodeName() {
+        for (const nodeId of selectedNodes.value) {
+            if (newNodeName.value.trim()) {
+                nodes[nodeId].name = newNodeName.value.trim(); // Actualiza el nombre del nodo
+            }
+        }
+    }
 
-    // Nueva funcionalidad para actualizar el nombre del nodo
-    const newNodeName = ref("");
-    const updateNodeName = () => {
-        if (selectedNodes.value.length === 1) {
-            const nodeId = selectedNodes.value[0];
-            nodes[nodeId].name = newNodeName.value;
-            newNodeName.value = "";
+    // Funciones para manejar aristas
+    function addEdge() {
+        if (selectedNodes.value.length !== 2) return;
+        const [source, target] = selectedNodes.value;
+        const edgeId = `edge${nextEdgeIndex.value}`;
+        edges[edgeId] = { source, target };
+        nextEdgeIndex.value++;
+    }
+
+    function removeEdge() {
+        for (const edgeId of selectedEdges.value) {
+            delete edges[edgeId];
+        }
+    }
+
+    // Observa los nodos seleccionados para permitir cambiar el nombre
+    watch(selectedNodes, (newSelection) => {
+        if (newSelection.length === 1) {
+            const nodeId = newSelection[0];
+            newNodeName.value = nodes[nodeId].name; // Cargar el nombre actual del nodo
         } else {
-            alert("Por favor selecciona un único nodo para renombrarlo.");
+            newNodeName.value = ""; // Limpiar si no hay un solo nodo seleccionado
         }
-    };
+    });
 </script>
 
 <template>
@@ -91,6 +72,14 @@
                     @click="removeNode">
                     Eliminar Nodo
                 </button>
+                <div v-if="selectedNodes.length === 1" class="mt-2">
+                    <input
+                        type="text"
+                        v-model="newNodeName"
+                        @input="updateNodeName"
+                        placeholder="Cambiar nombre del nodo"
+                        class="form-control form-control-sm" />
+                </div>
             </div>
             <div class="col">
                 <label class="form-label">Arista:</label>
@@ -107,31 +96,6 @@
                     Eliminar Arista
                 </button>
             </div>
-            <div class="col">
-                <div class="form-check">
-                    <input
-                        type="checkbox"
-                        class="form-check-input"
-                        id="d3ForceCheckbox"
-                        v-model="d3ForceEnabled" />
-                    <label class="form-check-label" for="d3ForceCheckbox">
-                        D3-Force habilitado
-                    </label>
-                </div>
-            </div>
-            <div class="col">
-                <input
-                    type="text"
-                    v-model="newNodeName"
-                    class="form-control form-control-sm"
-                    placeholder="Renombrar Nodo" />
-                <button
-                    class="btn btn-secondary btn-sm mt-2"
-                    @click="updateNodeName"
-                    :disabled="selectedNodes.length !== 1">
-                    Cambiar Nombre
-                </button>
-            </div>
         </div>
 
         <div class="network-graph-container bg-light rounded shadow-sm p-3">
@@ -140,8 +104,8 @@
                 v-model:selected-edges="selectedEdges"
                 :nodes="nodes"
                 :edges="edges"
-                :layouts="layouts"
-                :configs="configs" />
+                :layouts="data.layouts"
+                :configs="data.configs" />
         </div>
 
         <div class="mt-5 mb-5">
@@ -226,7 +190,6 @@
         display: inline-block;
         margin-right: 8px;
     }
-
     .line {
         width: 40px; /* Ajusta la longitud de la línea */
         height: 2px; /* Ajusta el grosor de la línea */
