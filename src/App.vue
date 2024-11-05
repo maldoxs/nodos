@@ -1,7 +1,7 @@
 <script setup lang="ts">
-    import { reactive, ref, watch } from "vue";
+    import { reactive, ref } from "vue";
     import { VNetworkGraph } from "v-network-graph";
-    import data from "./data"; // Importa los datos de configuración
+    import data from "./data";
 
     const nodes = reactive({ ...data.nodes });
     const edges = reactive({ ...data.edges });
@@ -9,9 +9,8 @@
     const nextEdgeIndex = ref(Object.keys(edges).length + 1);
     const selectedNodes = ref<string[]>([]);
     const selectedEdges = ref<string[]>([]);
-    const newNodeName = ref<string>(""); // Nuevo nombre para el nodo
+    const newNodeName = ref<string>("");
 
-    // Funciones para manejar nodos
     function addNode() {
         const nodeId = `node${nextNodeIndex.value}`;
         const name = `N${nextNodeIndex.value}`;
@@ -23,20 +22,14 @@
         for (const nodeId of selectedNodes.value) {
             delete nodes[nodeId];
         }
-        selectedNodes.value = []; // Limpiar selección después de eliminar
+        selectedNodes.value = [];
     }
 
-    function updateNodeName() {
-        for (const nodeId of selectedNodes.value) {
-            if (newNodeName.value.trim()) {
-                nodes[nodeId].name = newNodeName.value.trim(); // Actualiza el nombre del nodo
-            }
-        }
-    }
-
-    // Funciones para manejar aristas
     function addEdge() {
-        if (selectedNodes.value.length !== 2) return;
+        if (selectedNodes.value.length !== 2) {
+            alert("Por favor selecciona exactamente dos nodos para crear una arista.");
+            return;
+        }
         const [source, target] = selectedNodes.value;
         const edgeId = `edge${nextEdgeIndex.value}`;
         edges[edgeId] = { source, target };
@@ -49,15 +42,15 @@
         }
     }
 
-    // Observa los nodos seleccionados para permitir cambiar el nombre
-    watch(selectedNodes, (newSelection) => {
-        if (newSelection.length === 1) {
-            const nodeId = newSelection[0];
-            newNodeName.value = nodes[nodeId].name; // Cargar el nombre actual del nodo
+    const updateNodeName = () => {
+        if (selectedNodes.value.length === 1) {
+            const nodeId = selectedNodes.value[0];
+            nodes[nodeId].name = newNodeName.value;
+            newNodeName.value = "";
         } else {
-            newNodeName.value = ""; // Limpiar si no hay un solo nodo seleccionado
+            alert("Por favor selecciona un único nodo para renombrarlo.");
         }
-    });
+    };
 </script>
 
 <template>
@@ -72,14 +65,14 @@
                     @click="removeNode">
                     Eliminar Nodo
                 </button>
-                <div v-if="selectedNodes.length === 1" class="mt-2">
+                <!-- <div v-if="selectedNodes.length === 1" class="mt-2">
                     <input
                         type="text"
                         v-model="newNodeName"
                         @input="updateNodeName"
                         placeholder="Cambiar nombre del nodo"
                         class="form-control form-control-sm" />
-                </div>
+                </div> -->
             </div>
             <div class="col">
                 <label class="form-label">Arista:</label>
@@ -94,6 +87,19 @@
                     :disabled="selectedEdges.length === 0"
                     @click="removeEdge">
                     Eliminar Arista
+                </button>
+            </div>
+            <div class="col">
+                <input
+                    type="text"
+                    v-model="newNodeName"
+                    class="form-control form-control-sm"
+                    placeholder="Renombrar Nodo" />
+                <button
+                    class="btn btn-secondary btn-sm mt-2"
+                    @click="updateNodeName"
+                    :disabled="selectedNodes.length !== 1">
+                    Cambiar Nombre
                 </button>
             </div>
         </div>
