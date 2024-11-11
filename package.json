@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@element-plus/icons": "^0.0.11",
     "@popperjs/core": "^2.11.8",
     "bootstrap": "^5.3.3",
     "d3-force": "^3.0.0",

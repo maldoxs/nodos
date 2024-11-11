@@ -45,11 +45,6 @@ node: {
        },
     shape: "square", // Forma del nodo: 'circle', 'square', 'rectangle', etc.
     color: "orange", // Color de fondo del nodo (cambiado a naranja)
-    // border: { // Configuración del borde del nodo
-    //         width: 1, // Ancho del borde
-    //         color: "black", // Color del borde
-    //         style: "dashed", // Estilo del borde: 'solid', 'dashed', 'dotted'
-    // },
     opacity: 0.8, // Opacidad del nodo: 0 (transparente) a 1 (opaco)
     image: "url/to/image.png", // URL de una imagen para usar como fondo del nodo
     tooltip: { // Configuración del tooltip (información sobre herramientas)
