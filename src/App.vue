@@ -1,5 +1,5 @@
 <script setup lang="ts">
-    import { reactive, ref } from "vue";
+    import { reactive, ref, onMounted } from "vue";
     import * as vNG from "v-network-graph";
     import { VNetworkGraph } from "v-network-graph";
     import data from "./data";
@@ -19,26 +19,26 @@
         node: data.configs.node,
         edge: data.configs.edge,
         view: {
-            panEnabled: true, // Permite hacer pan (arrastrar el gráfico completo)
-            zoomEnabled: false, // Deshabilita el zoom
-            zoomMin: 0.5, // Nivel mínimo de zoom
-            zoomMax: 1, // Nivel máximo de zoom
-            backgroundColor: "red", // Color de fondo del gráfico
+            panEnabled: true,
+            zoomEnabled: false,
+            zoomMin: 0.5,
+            zoomMax: 1,
+            backgroundColor: "red",
         },
     });
 
     async function downloadAsSvg() {
-        if (!graph.value) return; // Asegúrate de que graph no sea null
+        if (!graph.value) return;
         try {
             const svgText = await graph.value.exportAsSvgText();
             const blob = new Blob([svgText], { type: "image/svg+xml" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = "network-graph.svg"; // Nombre del archivo para descargar
-            document.body.appendChild(a); // Añadir el enlace al cuerpo para que funcione en Firefox
+            a.download = "network-graph.svg";
+            document.body.appendChild(a);
             a.click();
-            document.body.removeChild(a); // Eliminar el enlace después de la descarga
+            document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
         } catch (error) {
             console.error("Error al exportar como SVG:", error);
@@ -48,7 +48,9 @@
     // Funciones para agregar y eliminar nodos y aristas...
     const addNode = () => {
         const nodeId = `node${nextNodeIndex.value}`;
+
         const name = `N${nextNodeIndex.value}`;
+
         nodes[nodeId] = { name };
         nextNodeIndex.value++;
     };
@@ -66,7 +68,7 @@
             return;
         }
         const [source, target] = selectedNodes.value;
-        const edgeId = `edge${nextEdgeIndex.value}`;
+        const edgeId = `edge${nextEdgeIndex.value}`; // Corregido: añadiendo comillas
         edges[edgeId] = { source, target };
         nextEdgeIndex.value++;
     };
@@ -75,6 +77,7 @@
         for (const edgeId of selectedEdges.value) {
             delete edges[edgeId];
         }
+        selectedEdges.value = [];
     };
 
     const updateNodeName = () => {
@@ -86,6 +89,50 @@
             alert("Por favor selecciona un único nodo para renombrarlo.");
         }
     };
+
+    const saveNodes = () => {
+        const currentGraphState = {
+            nodes: { ...nodes },
+            edges: { ...edges },
+            nextNodeIndex: nextNodeIndex.value,
+            nextEdgeIndex: nextEdgeIndex.value,
+        };
+        localStorage.setItem("savedGraphState", JSON.stringify(currentGraphState));
+        console.log("Estado guardado:", currentGraphState);
+        alert("Nodos y aristas guardados correctamente.");
+    };
+
+    const loadNodes = () => {
+        const savedGraphState = localStorage.getItem("savedGraphState");
+        if (savedGraphState) {
+            const {
+                nodes: savedNodes,
+                edges: savedEdges,
+                nextNodeIndex: savedNodeIndex,
+                nextEdgeIndex: savedEdgeIndex,
+            } = JSON.parse(savedGraphState);
+
+            // Restaurar nodos y aristas de forma reactiva
+            for (const nodeId in savedNodes) {
+                nodes[nodeId] = savedNodes[nodeId];
+            }
+            for (const edgeId in savedEdges) {
+                edges[edgeId] = savedEdges[edgeId];
+            }
+
+            // Restaurar los índices para evitar la sobrescritura
+            nextNodeIndex.value = savedNodeIndex;
+            nextEdgeIndex.value = savedEdgeIndex;
+
+            console.log("Estado cargado desde el almacenamiento local:", savedGraphState);
+        } else {
+            console.log("No se encontró estado guardado.");
+        }
+    };
+
+    onMounted(() => {
+        loadNodes();
+    });
 </script>
 
 <template>
@@ -110,6 +157,9 @@
                                 Eliminar Nodo
                             </button>
                         </div>
+                        <button class="btn btn-outline-success btn-sm mt-2" @click="saveNodes">
+                            Guardar Nodos
+                        </button>
                     </div>
                     <!-- Sección de acciones de Arista -->
                     <div class="col-md-3 d-flex flex-column align-items-start">
@@ -169,7 +219,6 @@
                 :layouts="data.layouts"
                 :configs="configs"
                 ref="graph" />
-            <!-- Agrega una referencia aquí -->
         </div>
 
         <div class="mt-5 mb-5">
@@ -221,39 +270,39 @@
 
     .btn-download {
         display: flex;
-        align-items: center; /* Centrar verticalmente el contenido */
-        padding: 4px 12px !important; /* Añadir espacio alrededor del texto */
-        border-radius: 5px; /* Bordes redondeados */
-        font-weight: bold; /* Texto en negrita */
+        align-items: center;
+        padding: 4px 12px !important;
+        border-radius: 5px;
+        font-weight: bold;
         background-color: #0056b3;
         color: #fff;
     }
 
-    /* .btn-download:hover {
-        background-color: #0056b3;
-        color: white; /
-    } */
-
     h1 {
         color: #333;
     }
+
     .dictionary {
         border-collapse: collapse;
         width: 100%;
         margin-top: 20px;
     }
+
     .dictionary th,
     .dictionary td {
         border: 1px solid #ddd;
         padding: 8px;
         text-align: left;
     }
+
     .dictionary th {
         color: white;
     }
+
     .dictionary td {
         background-color: #fff;
     }
+
     .circle {
         width: 20px;
         height: 20px;
@@ -262,27 +311,13 @@
         display: inline-block;
         margin-right: 8px;
     }
+
     .line {
-        width: 40px; /* Ajusta la longitud de la línea */
-        height: 1px; /* Ajusta el grosor de la línea */
+        width: 40px;
+        height: 1px;
         background-color: #007bff;
         display: inline-block;
         margin-right: 8px;
         vertical-align: middle;
-    }
-
-    /* Estilos para el botón de descarga */
-    .btn-download {
-        display: flex;
-        align-items: center;
-        padding: 8px 12px; /* Reduce el padding */
-        border-radius: 4px; /* Bordes redondeados más pequeños */
-        font-weight: bold; /* Texto en negrita */
-        font-size: 0.875rem; /* Tamaño de fuente más pequeño */
-    }
-
-    .btn-download:hover {
-        background-color: #0056b3; /* Color de fondo al pasar el ratón */
-        color: white; /* Cambiar color del texto al pasar el ratón */
     }
 </style>
