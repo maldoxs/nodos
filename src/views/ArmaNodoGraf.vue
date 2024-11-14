@@ -81,6 +81,7 @@
                 :edges="edges"
                 :layouts="data.layouts"
                 :configs="configs"
+                @node-moved="onNodeMoved"
                 ref="graph" />
         </div>
 
@@ -150,6 +151,17 @@
         },
     });
 
+    // Función para manejar el evento de mover nodo
+    const onNodeMoved = (nodeId: string, newPosition: { x: number; y: number }) => {
+        if (nodes[nodeId]) {
+            nodes[nodeId].x = newPosition.x;
+            nodes[nodeId].y = newPosition.y;
+            console.log(
+                `Nodo ${nodeId} movido a nuevas coordenadas: (${newPosition.x}, ${newPosition.y})`
+            );
+        }
+    };
+
     async function downloadAsSvg() {
         if (!graph.value) return;
         try {
@@ -170,12 +182,19 @@
 
     // Funciones para agregar y eliminar nodos y aristas...
     const addNode = () => {
-        const nodeId = `node${nextNodeIndex.value}`;
+        const nodeId = `node${nextNodeIndex.value}`; // Crear ID único para el nodo
+        const name = `Nodo ${nextNodeIndex.value}`; // Crear nombre basado en el índice del nodo
+        const x = Math.random() * 400; // Coordenada aleatoria x
+        const y = Math.random() * 400; // Coordenada aleatoria y
 
-        const name = `N${nextNodeIndex.value}`;
+        // Crear el nodo con el nombre y las coordenadas
+        nodes[nodeId] = { name, x, y };
 
-        nodes[nodeId] = { name };
+        // Incrementar el índice del siguiente nodo
         nextNodeIndex.value++;
+
+        // Mostrar las coordenadas del nuevo nodo en la consola
+        console.log(`Nodo creado: ${name}, Coordenadas: (${x}, ${y})`);
     };
 
     const removeNode = () => {
@@ -215,7 +234,7 @@
 
     const saveNodes = () => {
         const currentGraphState = {
-            nodes: { ...nodes },
+            nodes: { ...nodes }, // Realiza una copia de los nodos
             edges: { ...edges },
             nextNodeIndex: nextNodeIndex.value,
             nextEdgeIndex: nextEdgeIndex.value,
