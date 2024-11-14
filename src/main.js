@@ -1,5 +1,12 @@
 import { createApp } from "vue";
 import App from "./App.vue";
+import router from "./router";
+
+// Importa Element Plus y los iconos
+import ElementPlus from "element-plus";
+import "element-plus/dist/index.css"; // Asegúrate de incluir los estilos de Element Plus
+
+// Importa el plugin de gráficos en red
 import VNetworkGraph from "v-network-graph";
 import "v-network-graph/lib/style.css";
 
@@ -12,5 +19,15 @@ import "./assets/custom-bootstrap.scss";
 import "bootstrap/dist/js/bootstrap.bundle.min.js";
 
 const app = createApp(App);
-app.use(VNetworkGraph); // Registra el plugin del gráfico de red
-app.mount("#app"); // Monta la aplicación en el elemento con ID 'app'
+
+// Usa Element Plus y regístralo en la aplicación
+app.use(ElementPlus); // Registra Element Plus
+
+// Usa el plugin de gráficos en red
+app.use(VNetworkGraph);
+
+// Usa el router
+app.use(router);
+
+// Monta la aplicación en el elemento con ID 'app'
+app.mount("#app");

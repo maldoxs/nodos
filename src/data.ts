@@ -15,6 +15,7 @@ const layouts: Layouts = {
     node1: { x: 50, y: 0 },
     node2: { x: 0, y: 75 },
     node3: { x: 100, y: 75 },
+
   },
 }
 
@@ -43,7 +44,7 @@ node: {
        hover: {
             color: "#0d6efd",
        },
-    shape: "square", // Forma del nodo: 'circle', 'square', 'rectangle', etc.
+    shape: "rectangle", // Forma del nodo: 'circle', 'square', 'rectangle', etc.
     color: "orange", // Color de fondo del nodo (cambiado a naranja)
     opacity: 0.8, // Opacidad del nodo: 0 (transparente) a 1 (opaco)
     image: "url/to/image.png", // URL de una imagen para usar como fondo del nodo
@@ -59,9 +60,13 @@ node: {
         fontSize: 40, // Tamaño de la fuente de la etiqueta
         color: "#ccc", // Color de la etiqueta
         position: "start", // Posición de la etiqueta (start, middle, end)
+      },
+        marker: {
+        target: { type: "arrow" },
     },
+
     normal: {
-        width: 1, // Ancho de las aristas
+        width: 2, // Ancho de las aristas
         //color:"#0464a4"
       },
 
