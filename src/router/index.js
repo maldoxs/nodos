@@ -6,7 +6,7 @@ const routes = [
     {
         path: "/",
         name: "home",
-        component: () => import("../views/HomeView.vue"), // Carga diferida del componente HomeView
+        component: () => import("../views/ArmaNodoGraf.vue"), // Carga diferida del componente HomeView
     },
     {
         path: "/about",
