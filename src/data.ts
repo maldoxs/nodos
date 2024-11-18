@@ -1,26 +1,42 @@
 import { reactive, watchEffect } from 'vue'
 import { Nodes, Edges, Layouts, defineConfigs } from 'v-network-graph'
 
+// Función para generar las coordenadas de los nodos dinámicamente
+const generateNodeCoordinates = (totalNodes) => {
+  const nodes = {};
+  let x = 50;
+  let y = 0;
+
+  for (let i = 1; i <= totalNodes; i++) {
+    nodes[`node${i}`] = { x, y };
+
+    // Ajuste de coordenadas: se aumenta el valor de `x` cada 4 nodos y `y` después de cada 5 nodos
+    if (i % 5 === 0) {
+      y += 75; // Incrementa la coordenada `y` cada 5 nodos
+      x = 50;  // Resetea la coordenada `x` cada vez que se incrementa `y`
+    } else {
+      x += 100; // Incrementa la coordenada `x` para la siguiente posición
+    }
+  }
+
+  return nodes;
+};
+
+// Recuperar el objeto layouts del localStorage o establecer valores predeterminados
+const savedLayouts = localStorage.getItem('layouts');
+const initialLayouts = savedLayouts ? JSON.parse(savedLayouts) : {
+  nodes: generateNodeCoordinates(40),  // Generamos las coordenadas dinámicas para 40 nodos
+}
+
 // Definir el estado reactivo para los nodos y las coordenadas
 const nodes: Nodes = {
-  node1: { name: 'N1' },
-  node2: { name: 'N2' },
-  node3: { name: 'N3' },
+  node1: { name: 'Node1' },
+
   // Puedes agregar más nodos aquí en el futuro
 }
 
 const edges: Edges = {
   edge1: { source: 'node1', target: 'node2' },
-}
-
-// Recuperar el objeto layouts del localStorage o establecer valores predeterminados
-const savedLayouts = localStorage.getItem('layouts')
-const initialLayouts = savedLayouts ? JSON.parse(savedLayouts) : {
-  nodes: {
-    node1: { x: 50, y: 0 },
-    node2: { x: 0, y: 75 },
-    node3: { x: 100, y: 75 },
-  },
 }
 
 // Hacer que layouts sea reactivo
