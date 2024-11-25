@@ -73,6 +73,11 @@
             </div>
         </div>
 
+        <div>
+            <el-button @click="addHotPinkNodeHandler">Add HotPink</el-button>
+            <!-- Aquí podrías tener el componente de la red que utiliza los nodos configurados -->
+        </div>
+
         <div class="network-graph-container bg-light rounded shadow-sm p-3">
             <v-network-graph
                 v-model:selected-nodes="selectedNodes"
@@ -123,11 +128,17 @@
 </template>
 
 <script setup lang="ts">
-    import { reactive, ref, onMounted } from "vue";
-    import * as vNG from "v-network-graph";
-    import { VNetworkGraph } from "v-network-graph";
-    import data from "../data";
-    import { Download } from "@element-plus/icons";
+    import { reactive, ref, onMounted } from "vue"; // Importa funciones de Vue
+    import * as vNG from "v-network-graph"; // Importa todos los elementos de 'v-network-graph' (usa 'vNG' para abreviar)
+    import { VNetworkGraph } from "v-network-graph"; // Importa el componente VNetworkGraph específicamente
+    import data from "../data"; // Asegúrate de que 'data' esté exportado correctamente desde '../data'
+    import { Download } from "@element-plus/icons"; // Importa el ícono 'Download' de Element Plus
+    import { addHotPinkNode } from "../data"; // Asegúrate de que 'addHotPinkNode' esté correctamente exportado desde '../data'
+
+    const addHotPinkNodeHandler = () => {
+        addHotPinkNode(nodes, nextNodeIndex); // Llama a la función pasando los nodos y el índice del siguiente nodo
+    };
+    // Código adicional aquí para la lógica de tu componente
 
     const nodes = reactive({ ...data.nodes });
     const edges = reactive({ ...data.edges });
@@ -187,8 +198,15 @@
         const x = Math.random() * 400; // Coordenada aleatoria x
         const y = Math.random() * 400; // Coordenada aleatoria y
 
-        // Crear el nodo con el nombre y las coordenadas
-        nodes[nodeId] = { name, x, y };
+        // Crear el nodo con las propiedades esperadas (name, x, y, size, color,label)
+        nodes[nodeId] = {
+            name,
+            x,
+            y,
+            size: 15, // Asignar un tamaño predeterminado
+            color: "#0064a0", // Asignar un color predeterminado
+            label: true,
+        };
 
         // Incrementar el índice del siguiente nodo
         nextNodeIndex.value++;
@@ -211,7 +229,9 @@
         }
         const [source, target] = selectedNodes.value;
         const edgeId = `edge${nextEdgeIndex.value}`; // Corregido: añadiendo comillas
-        edges[edgeId] = { source, target };
+        // Definir el color de la arista
+        const edgeColor = "#002C48"; // Puedes cambiar el color según sea necesario
+        edges[edgeId] = { source, target, color: edgeColor };
         nextEdgeIndex.value++;
     };
 
