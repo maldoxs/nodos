@@ -114,6 +114,7 @@ const configs = reactive(
         dasharray: edge => (edge.dashed ? "4" : "0"),
 
         },
+        selectable: true, // Asegúrate de que esta opción esté activa
          marker: {
          target: { type: 'arrow' },
         },
