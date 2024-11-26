@@ -7,87 +7,126 @@
             <div class="card-body">
                 <div class="row gy-3">
                     <!-- Sección de acciones de Nodo -->
-                    <div class="col-md-3 d-flex flex-column align-items-start">
-                        <h6 class="text-warning">Nodo</h6>
-                        <div class="btn-group">
-                            <button class="btn btn-primary btn-sm" @click="addNode">
-                                Añadir Nodo
-                            </button>
-                            <button
-                                class="btn btn-outline-danger btn-sm"
-                                :disabled="selectedNodes.length === 0"
-                                @click="removeNode">
-                                Eliminar Nodo
-                            </button>
-                        </div>
-                        <button class="btn btn-outline-success btn-sm mt-2" @click="saveNodes">
-                            Guardar Nodos
-                        </button>
-                    </div>
-                    <!-- Sección de acciones de Arista -->
-                    <div class="col-md-3 d-flex flex-column align-items-start">
-                        <h6 class="text-warning">Arista</h6>
-                        <div class="btn-group">
-                            <button
-                                class="btn btn-primary btn-sm"
-                                :disabled="selectedNodes.length !== 2"
-                                @click="addEdge">
-                                Añadir Arista
-                            </button>
-                            <button
-                                class="btn btn-outline-danger btn-sm"
-                                :disabled="selectedEdges.length === 0"
-                                @click="removeEdge">
-                                Eliminar Arista
-                            </button>
-                        </div>
-                    </div>
-                    <!-- Sección de cambio de nombre de nodo -->
-                    <div class="col-md-3">
-                        <h6 class="text-warning">Renombrar Nodo</h6>
-                        <div class="input-group input-group-sm">
-                            <input
-                                type="text"
-                                v-model="newNodeName"
-                                class="form-control"
-                                placeholder="Nombre del Nodo" />
-                            <button
-                                class="btn btn-outline-secondary"
-                                @click="updateNodeName"
-                                :disabled="selectedNodes.length !== 1">
-                                Cambiar Nombre
-                            </button>
+                    <div class="col-md-6">
+                        <div class="p-3 bg-light rounded shadow-sm">
+                            <h6 class="text-primary mb-3"><strong>Gestión de Nodos</strong></h6>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button
+                                    class="btn btn-warning btn-sm px-3 text-white"
+                                    @click="addHotPinkNodeHandler">
+                                    <i class="fas fa-plus-circle me-1"></i> Nodo Padre
+                                </button>
+                                <button class="btn btn-primary btn-sm px-3" @click="addNode">
+                                    <i class="fas fa-plus-circle me-1"></i> Nodo Hijo
+                                </button>
+                                <button
+                                    class="btn btn-danger btn-sm px-3"
+                                    :disabled="selectedNodes.length === 0"
+                                    @click="removeNode">
+                                    <i class="fas fa-trash-alt me-1"></i> Eliminar Nodo
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="col-md-3 flex-column align-items-end">
-                        <h6 class="text-warning">Descargar SVG</h6>
-                        <div class="btn-group">
-                            <el-button type="primary" class="btn-download" @click="downloadAsSvg">
-                                <el-icon><download /></el-icon>
-                                <span class="btn-text">Descargar</span>
-                            </el-button>
+                    <!-- Sección de acciones de Arista -->
+                    <div class="col-md-6">
+                        <div class="p-3 bg-light rounded shadow-sm">
+                            <h6 class="text-primary mb-3"><strong>Gestión de Aristas</strong></h6>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button
+                                    class="btn btn-primary btn-sm px-3"
+                                    :disabled="selectedNodes.length !== 2"
+                                    @click="addEdge">
+                                    <i class="fas fa-link me-1"></i> Crear Arista
+                                </button>
+                                <button
+                                    class="btn btn-danger btn-sm px-3"
+                                    :disabled="selectedEdges.length === 0"
+                                    @click="removeEdge">
+                                    <i class="fas fa-unlink me-1"></i> Eliminar Arista
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sección de cambio de nombre de nodo -->
+                    <div class="col-md-6 mt-3">
+                        <div class="p-3 bg-light rounded shadow-sm">
+                            <h6 class="text-primary mb-3"><strong>Renombrar Nodo</strong></h6>
+                            <div class="d-flex flex-column gap-2">
+                                <input
+                                    type="text"
+                                    v-model="newNodeName"
+                                    class="form-control form-control-sm"
+                                    placeholder="Nuevo Nombre del Nodo" />
+                                <button
+                                    class="btn btn-secondary btn-sm px-3"
+                                    :disabled="selectedNodes.length !== 1"
+                                    @click="updateNodeName">
+                                    <i class="fas fa-edit me-1"></i> Cambiar Nombre
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sección de descarga -->
+                    <div class="col-md-6 mt-3">
+                        <div class="p-3 bg-light rounded shadow-sm">
+                            <h6 class="text-primary mb-3"><strong>Exportar</strong></h6>
+                            <div>
+                                <el-button
+                                    type="primary"
+                                    class="btn-download"
+                                    @click="downloadAsSvg">
+                                    <el-icon><download /></el-icon>
+                                    Descargar SVG
+                                </el-button>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+            <div class="text-center">
+                <button class="btn btn-success btn-sm px-3" @click="saveNodes">
+                    <i class="fas fa-save me-1"></i> Guardar Esquema
+                </button>
+            </div>
         </div>
+        <div></div>
 
         <div>
-            <el-button @click="addHotPinkNodeHandler">Add HotPink</el-button>
+            <!-- <el-button @click="addHotPinkNodeHandler">Add HotPink</el-button> -->
             <!-- Aquí podrías tener el componente de la red que utiliza los nodos configurados -->
         </div>
 
-        <div class="network-graph-container bg-light rounded shadow-sm p-3">
-            <v-network-graph
-                v-model:selected-nodes="selectedNodes"
-                v-model:selected-edges="selectedEdges"
-                :nodes="nodes"
-                :edges="edges"
-                :layouts="data.layouts"
-                :configs="configs"
-                @node-moved="onNodeMoved"
-                ref="graph" />
+        <div class="tooltip-wrapper">
+            <div class="network-graph-container bg-light rounded shadow-sm p-3">
+                <v-network-graph
+                    v-model:selected-nodes="selectedNodes"
+                    v-model:selected-edges="selectedEdges"
+                    :nodes="nodes"
+                    :edges="edges"
+                    :layouts="layouts"
+                    :configs="configs"
+                    @node-moved="onNodeMoved"
+                    :event-handlers="eventHandlers"
+                    ref="graph" />
+                <!-- Tooltip dinámico -->
+                <div
+                    ref="tooltip"
+                    class="tooltip"
+                    :style="{ ...tooltipPos, opacity: tooltipOpacity }">
+                    <div><strong>ID:</strong> {{ tooltipData.id }}</div>
+                    <div><strong>Nombre:</strong> {{ tooltipData.name }}</div>
+                    <div><strong>Posición:</strong> ({{ tooltipData.x }}, {{ tooltipData.y }})</div>
+                    <div><strong>Tamaño:</strong> {{ tooltipData.size }}</div>
+                    <div>
+                        <strong>Color:</strong>
+                        <span :style="{ color: tooltipData.color }">{{ tooltipData.color }}</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="mt-3 mb-1">
@@ -128,7 +167,7 @@
 </template>
 
 <script setup lang="ts">
-    import { reactive, ref, onMounted } from "vue"; // Importa funciones de Vue
+    import { reactive, ref, onMounted, computed, watch } from "vue"; // Importa funciones de Vue
     import * as vNG from "v-network-graph"; // Importa todos los elementos de 'v-network-graph' (usa 'vNG' para abreviar)
     import { VNetworkGraph } from "v-network-graph"; // Importa el componente VNetworkGraph específicamente
     import data from "../data"; // Asegúrate de que 'data' esté exportado correctamente desde '../data'
@@ -147,29 +186,104 @@
     const selectedNodes = ref<string[]>([]);
     const selectedEdges = ref<string[]>([]);
     const newNodeName = ref<string>("");
-    const graph = ref<vNG.Instance | null>(null); // Inicializar con null
 
-    // Extrae la configuración desde el objeto de datos
+    const layouts = reactive(data.layouts);
+
+    // Tooltip dinámico
+    const tooltip = ref<HTMLDivElement>();
+    const tooltipData = ref<Record<string, any>>({});
+    const tooltipOpacity = ref(0);
+    const tooltipPos = ref({ left: "0px", top: "0px" });
+    const targetNodeId = ref<string>("");
+
+    const graph = ref<vNG.Instance | null>(null); // Inicializar con null
+    // Reemplazar el cálculo de la posición del nodo en el tooltip
+    const targetNodePos = computed(() => {
+        // Comprueba si el nodo existe en layouts.nodes
+        const nodeLayout = layouts.nodes[targetNodeId.value];
+        return nodeLayout ? { x: nodeLayout.x, y: nodeLayout.y } : { x: 0, y: 0 };
+    });
+
+    // Reemplazar el cálculo de la posición del nodo en el tooltip
+    // Actualiza la lógica del watch para reutilizar targetNodePos
+    watch(
+        () => [targetNodeId.value, tooltipOpacity.value],
+        () => {
+            if (!graph.value || !tooltip.value || !targetNodeId.value) return;
+
+            const nodeLayout = layouts.nodes[targetNodeId.value];
+            if (nodeLayout) {
+                const domPoint = graph.value.translateFromSvgToDomCoordinates(nodeLayout);
+
+                tooltipPos.value = {
+                    left: `${domPoint.x - tooltip.value.offsetWidth / 2}px`,
+                    top: `${domPoint.y - tooltip.value.offsetHeight - 20}px`,
+                };
+            }
+        }
+    );
+
+    /// **Eventos del grafo**
+    const eventHandlers: vNG.EventHandlers = {
+        "node:pointerover": ({ node }) => {
+            const nodeData = nodes[node];
+            const nodeLayout = layouts.nodes[node];
+
+            if (nodeData && nodeLayout) {
+                // Actualiza los datos del tooltip
+                tooltipData.value = {
+                    id: node,
+                    name: nodeData.name || `Nodo sin nombre (${node})`,
+                    x: nodeLayout.x,
+                    y: nodeLayout.y,
+                    size: nodeData.size,
+                    color: nodeData.color,
+                };
+                // Mostrar tooltip
+                tooltipOpacity.value = 1;
+                // Calcular posición del tooltip
+                updateTooltipPosition(nodeLayout);
+            }
+        },
+        "node:pointerout": () => {
+            tooltipOpacity.value = 0; // Ocultar tooltip
+        },
+    };
+
+    // **Actualizar posición del tooltip**
+    const updateTooltipPosition = (nodeLayout: { x: number; y: number }) => {
+        if (!graph.value) return;
+
+        // Mapea coordenadas SVG a DOM
+        const domPoint = graph.value.translateFromSvgToDomCoordinates(nodeLayout);
+
+        // Ajusta posición del tooltip para que quede arriba del nodo
+        const offsetY = 140; // Desplazamiento hacia arriba (ajusta según el tamaño de tus nodos y tooltip)
+        tooltipPos.value = {
+            left: `${domPoint.x}px`,
+            top: `${domPoint.y - offsetY}px`,
+        };
+    };
+
+    // Configuración del grafo
     const configs = reactive({
         node: data.configs.node,
         edge: data.configs.edge,
         view: {
             panEnabled: true,
-            zoomEnabled: false,
+            zoomEnabled: true,
             zoomMin: 0.5,
             zoomMax: 1,
-            backgroundColor: "red",
+            backgroundColor: "#f8f9fa",
         },
     });
 
-    // Función para manejar el evento de mover nodo
+    // Sincronización de nodos y layouts
     const onNodeMoved = (nodeId: string, newPosition: { x: number; y: number }) => {
         if (nodes[nodeId]) {
             nodes[nodeId].x = newPosition.x;
             nodes[nodeId].y = newPosition.y;
-            console.log(
-                `Nodo ${nodeId} movido a nuevas coordenadas: (${newPosition.x}, ${newPosition.y})`
-            );
+            layouts.nodes[nodeId] = { x: newPosition.x, y: newPosition.y };
         }
     };
 
@@ -192,27 +306,15 @@
     }
 
     // Funciones para agregar y eliminar nodos y aristas...
+    // **Agregar un nodo**
     const addNode = () => {
-        const nodeId = `node${nextNodeIndex.value}`; // Crear ID único para el nodo
-        const name = `Nodo ${nextNodeIndex.value}`; // Crear nombre basado en el índice del nodo
-        const x = Math.random() * 400; // Coordenada aleatoria x
-        const y = Math.random() * 400; // Coordenada aleatoria y
-
-        // Crear el nodo con las propiedades esperadas (name, x, y, size, color,label)
-        nodes[nodeId] = {
-            name,
-            x,
-            y,
-            size: 15, // Asignar un tamaño predeterminado
-            color: "#0064a0", // Asignar un color predeterminado
-            label: true,
-        };
-
-        // Incrementar el índice del siguiente nodo
+        const nodeId = `node${nextNodeIndex.value}`;
+        const name = `Nodo ${nextNodeIndex.value}`;
+        const x = Math.random() * 400;
+        const y = Math.random() * 400;
+        nodes[nodeId] = { name, x, y, size: 15, color: "#0064a0", label: true };
+        layouts.nodes[nodeId] = { x, y };
         nextNodeIndex.value++;
-
-        // Mostrar las coordenadas del nuevo nodo en la consola
-        console.log(`Nodo creado: ${name}, Coordenadas: (${x}, ${y})`);
     };
 
     const removeNode = () => {
@@ -358,5 +460,27 @@
         display: inline-block;
         margin-right: 8px;
         vertical-align: middle;
+    }
+
+    .network-graph-container {
+        position: relative;
+        height: 700px;
+        width: 100%;
+        border: 2px solid #dee2e6;
+        border-radius: 10px;
+        background-color: #ffffff;
+        padding: 20px;
+    }
+
+    .tooltip {
+        position: absolute;
+        background-color: white;
+        border: 1px solid #ddd;
+        padding: 10px;
+        border-radius: 4px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        pointer-events: none;
+        transition: opacity 0.2s ease-in-out;
+        z-index: 1000;
     }
 </style>
