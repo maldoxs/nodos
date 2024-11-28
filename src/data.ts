@@ -2,81 +2,181 @@ import { reactive, watchEffect } from 'vue'
 import { Nodes, Edges, Layouts, defineConfigs } from 'v-network-graph'
 import * as vNG from "v-network-graph"
 
-
-// Interfaz del nodo
-interface Node {
-    name: string;
-    x: number;
-    y: number;
-    size: number; // Definir el tamaño
-    color: string; // Definir el color
-    label?: boolean
+// Definir una interfaz para los datos adicionales del nodo
+interface NodeData {
+  id?: number;
+  nombre?: string;
+  rut?: string;
+  tipo?: string;
+  capitalEnterado?: number;
+  lineaNegocio?: string;
+  empresas?: any[];
+  participaciones?: any[];
 }
 
+// Actualizar la interfaz del nodo
+interface Node {
+  name: string;
+  x: number;
+  y: number;
+  size: number; // Definir el tamaño
+  color: string; // Definir el color
+  label?: boolean;
+  data?: NodeData; // Añadir esta línea para incluir la propiedad 'data'
+}
 
 // Interfaz del borde
 interface Edge extends vNG.Edge {
-  color: string
-  dashed?: boolean
+  color: string;
+  dashed?: boolean;
 }
 
-// Función para generar las coordenadas de los nodos dinámicamente
-const generateNodeCoordinates = (totalNodes) => {
-  const nodes = {};
-  let x = 50;
-  let y = 0;
-
-  for (let i = 1; i <= totalNodes; i++) {
-    nodes[`node${i}`] = { x, y };
-
-    // Ajuste de coordenadas: se aumenta el valor de `x` cada 4 nodos y `y` después de cada 5 nodos
-    if (i % 5 === 0) {
-      y += 75; // Incrementa la coordenada `y` cada 5 nodos
-      x = 50;  // Resetea la coordenada `x` cada vez que se incrementa `y`
-    } else {
-      x += 100; // Incrementa la coordenada `x` para la siguiente posición
-    }
-  }
-
-  return nodes;
-};
+// Nodos y aristas reactivos
+const nodes = reactive<Record<string, Node>>({});
+const edges: Edges = reactive({});
 
 // Recuperar el objeto layouts del localStorage o establecer valores predeterminados
 const savedLayouts = localStorage.getItem('layouts');
 const initialLayouts = savedLayouts ? JSON.parse(savedLayouts) : {
-  nodes: generateNodeCoordinates(40),  // Generamos las coordenadas dinámicas para 40 nodos
-}
-
-// Definir el estado reactivo para los nodos y las coordenadas
-// Los nodos reactivos
-const nodes = reactive<Record<string, Node>>({
-  node1: { name: "Node 5", size: 25, color: "#eb510d", x: 400, y: 0, label: true },
-
-})
-
-
-// Función para agregar un nodo de color "hotpink"
-// data.ts
-export const addHotPinkNode = (nodes: any, nextNodeIndex: any) => {
-    const nodeId = `node${nextNodeIndex.value}`;
-    const name = `Nodo Padre ${nextNodeIndex.value}`;
-    const x = Math.random() * 400;
-    const y = Math.random() * 400;
-
-    // Crear el nodo con las propiedades necesarias, y asignar color HotPink
-    nodes[nodeId] = {
-        name,
-        x,
-        y,
-        size: 25,
-        color: "#eb510d", // Establecer el color a HotPink
-        label: true,
-    };
-
-    nextNodeIndex.value++;
-    console.log(`Nodo HotPink creado: ${name}, Coordenadas: (${x}, ${y})`);
+  nodes: {}
 };
 
+// JSON proporcionado
+const grupoEmpresarialData = {
+  "grupoEmpresarial": {
+    "id": 1,
+    "nombre": "Grupo Empresarial XYZ",
+    "rut": "12345678-9",
+    "tipo": "Matriz",
+    "capitalEnterado": 10000000,
+    "lineaNegocio": "Holding de empresas",
+    "empresas": [
+      {
+        "rut": "23456789-0",
+        "nombre": "XYZ Producción S.A.",
+        "tipo": "Operativa",
+        "capitalEnterado": 5000000,
+        "lineaNegocio": "Fabricación de productos",
+        "participaciones": [
+          {
+            "empresa": {
+              "rut": "12345678-9",
+              "nombre": "Grupo Empresarial XYZ S.A.",
+              "tipo": "Matriz"
+            },
+            "porcentajeParticipacion": 60,
+            "porcentajeParticipacionUtilidades": 70
+          }
+        ]
+      },
+      {
+        "rut": "34567890-1",
+        "nombre": "XYZ Distribución S.A.",
+        "tipo": "Operativa",
+        "capitalEnterado": 2000000,
+        "lineaNegocio": "Distribución y ventas de productos",
+        "participaciones": [
+          {
+            "empresa": {
+              "rut": "12345678-9",
+              "nombre": "Grupo Empresarial XYZ S.A.",
+              "tipo": "Matriz"
+            },
+            "porcentajeParticipacion": 80,
+            "porcentajeParticipacionUtilidades": 50
+          }
+        ]
+      }
+    ]
+  }
+};
+
+// Función para cargar los nodos y aristas desde el JSON
+function loadNodesFromJson() {
+  const grupoEmpresarial = grupoEmpresarialData.grupoEmpresarial;
+
+  // Crear nodo padre
+  const parentId = `node${grupoEmpresarial.id}`;
+  nodes[parentId] = {
+    name: grupoEmpresarial.nombre,
+    x: 0,
+    y: 0,
+    size: 25,
+    color: "#eb510d", // Color para nodos padres
+    label: true,
+    data: {
+      id: grupoEmpresarial.id,
+      nombre: grupoEmpresarial.nombre,
+      rut: grupoEmpresarial.rut,
+      tipo: grupoEmpresarial.tipo,
+      capitalEnterado: grupoEmpresarial.capitalEnterado,
+      lineaNegocio: grupoEmpresarial.lineaNegocio
+    }
+  };
+
+  // Crear nodos hijos y aristas
+  grupoEmpresarial.empresas.forEach((empresa, index) => {
+    const childId = `node${index + 2}`; // Aseguramos que los IDs no se repitan
+    nodes[childId] = {
+      name: empresa.nombre,
+      x: 200 * (index + 1), // Posición X ajustada
+      y: 150, // Posición Y fija para todos los hijos
+      size: 15,
+      color: "#0064a0", // Color para nodos hijos
+      label: true,
+      data: {
+        rut: empresa.rut,
+        nombre: empresa.nombre,
+        tipo: empresa.tipo,
+        capitalEnterado: empresa.capitalEnterado,
+        lineaNegocio: empresa.lineaNegocio,
+        participaciones: empresa.participaciones
+      }
+    };
+
+    // Crear arista entre el nodo padre y el nodo hijo
+    const edgeId = `edge${index + 1}`;
+    edges[edgeId] = {
+      source: parentId,
+      target: childId,
+      color: "#002C48"
+    };
+  });
+}
+
+// Llamamos a la función para cargar los nodos desde el JSON
+loadNodesFromJson();
+
+// Layouts reactivos
+const layouts: Layouts = reactive({
+  nodes: {}
+});
+
+// Asignar posiciones guardadas o por defecto
+Object.keys(nodes).forEach(nodeId => {
+  if (initialLayouts.nodes[nodeId]) {
+    // Si hay posiciones guardadas, las usamos
+    layouts.nodes[nodeId] = initialLayouts.nodes[nodeId];
+  } else {
+    // Si no, usamos las posiciones del nodo y las guardamos
+    layouts.nodes[nodeId] = { x: nodes[nodeId].x, y: nodes[nodeId].y };
+  }
+});
+
+// Función para actualizar la posición de un nodo en layouts
+const updateNodePosition = (nodeId: string, newPosition: { x: number, y: number }) => {
+  if (layouts.nodes[nodeId]) {
+    layouts.nodes[nodeId].x = newPosition.x;
+    layouts.nodes[nodeId].y = newPosition.y;
+    // Guardar los nuevos layouts en localStorage
+    localStorage.setItem('layouts', JSON.stringify(layouts));
+  }
+};
+
+// Verificar cambios en layouts y actualizar localStorage automáticamente
+watchEffect(() => {
+  localStorage.setItem('layouts', JSON.stringify(layouts))
+});
 
 // Configuración reactiva de los nodos y bordes
 const configs = reactive(
@@ -93,149 +193,38 @@ const configs = reactive(
       },
       selectable: true,
       label: {
-          visible: node => !!node.label,
-          directionAutoAdjustment: true,
-          fontSize: 15,
-      color: 'black',
-      fontFamily: 'Arial',
-      direction: 'south',
-
-
+        visible: node => !!node.label,
+        directionAutoAdjustment: true,
+        fontSize: 15,
+        color: 'black',
+        fontFamily: 'Arial',
+        direction: 'south',
       },
       focusring: {
         color: "darkgray",
-    },
-
+      },
     },
     edge: {
       normal: {
         width: 2,
         color: edge => edge.color,
         dasharray: edge => (edge.dashed ? "4" : "0"),
-
-        },
-        selectable: true, // Asegúrate de que esta opción esté activa
-         marker: {
-         target: { type: 'arrow' },
-        },
-
-    label: {
-     fontSize: 40,
-    },
-
       },
-
+      selectable: true,
+      marker: {
+        target: { type: 'arrow' },
+      },
+      label: {
+        fontSize: 40,
+      },
+    },
   })
-)
-
-
-
-const edges: Edges = {
-  edge1: { source: 'node1', target: 'node2' },
-}
-
-// Hacer que layouts sea reactivo
-const layouts: Layouts = reactive({
-  nodes: {
-    ...initialLayouts.nodes, // Copiar las coordenadas iniciales desde localStorage o valores predeterminados
-  }
-})
-
-// Función para actualizar la posición de un nodo en layouts
-const updateNodePosition = (nodeId: string, newPosition: { x: number, y: number }) => {
-  if (layouts.nodes[nodeId]) {
-    layouts.nodes[nodeId].x = newPosition.x;
-    layouts.nodes[nodeId].y = newPosition.y;
-    // Guardar los nuevos layouts en localStorage
-    localStorage.setItem('layouts', JSON.stringify(layouts));
-    console.log(`Posición de ${nodeId} actualizada a (${newPosition.x}, ${newPosition.y})`);
-  } else {
-    // Si el nodo no existe, lo agregamos con sus coordenadas
-    layouts.nodes[nodeId] = newPosition;
-
-    // Crear el nuevo nodo con las propiedades faltantes
-    nodes[nodeId] = {
-      name: `Nuevo Nodo ${nodeId.charAt(nodeId.length - 1)}`,
-      x: newPosition.x,
-      y: newPosition.y,
-      size: 10, // Puedes definir el valor adecuado para el tamaño
-      color: '#000000' // Definir un color por defecto o el que necesites
-    };
-
-    // Guardamos la nueva información
-    localStorage.setItem('layouts', JSON.stringify(layouts));
-    console.log(`Nodo ${nodeId} agregado con posición (${newPosition.x}, ${newPosition.y})`);
-  }
-}
-
-// Función para agregar un nuevo nodo con posiciones predeterminadas
-const addNode = (nodeId: string, name: string, position: { x: number, y: number }) => {
-  if (!nodes[nodeId]) {
-    // Agregar solo el nombre del nodo al objeto nodes
-    nodes[nodeId] = { name: name, size: 16, color: "gray", x: position.x, y: position.y, label: false };
-    // Asignar las coordenadas solo al objeto layouts
-    layouts.nodes[nodeId] = position
-    console.log(`Nodo ${nodeId} agregado en la posición (${position.x}, ${position.y})`)
-    localStorage.setItem('layouts', JSON.stringify(layouts)) // Actualizar el localStorage
-  }
-}
-
-
-// Verificar cambios en layouts y actualizar localStorage automáticamente
-watchEffect(() => {
-  localStorage.setItem('layouts', JSON.stringify(layouts))
-})
-
-// Configuración de la red
-// const configs = defineConfigs({
-//   node: {
-//     selectable: 2,
-//     label: {
-    //   fontSize: 15,
-    //   color: 'black',
-    //   fontWeight: 'bold',
-    //   fontFamily: 'Arial',
-    //   textAlign: 'left',
-    //   textDecoration: 'line-through',
-    //   visible: true,
-    //   direction: 'south',
-    //   directionAutoAdjustment: true,
-//     },
-//     normal: {
-//       radius: 20,
-//       color: '#0d6efd',
-//     },
-//     shape: 'rectangle',
-//     color: 'orange',
-//     opacity: 0.8,
-//     image: 'url/to/image.png',
-//     tooltip: {
-//       text: 'Información adicional',
-//       showOnHover: true,
-//     },
-//   },
-//   edge: {
-//     selectable: true,
-//     label: {
-//       fontSize: 40,
-//       color: '#ccc',
-//       position: 'start',
-//     },
-//     marker: {
-//       target: { type: 'arrow' },
-//     },
-//     normal: {
-//       width: 2,
-//     },
-//   },
-// })
+);
 
 export default {
   nodes,
   edges,
   layouts,
   configs,
-  updateNodePosition, // exporta la función para actualizar las coordenadas
-   addNode, // exporta la función para agregar un nuevo nodo
-  addHotPinkNode
-}
+  updateNodePosition,
+};

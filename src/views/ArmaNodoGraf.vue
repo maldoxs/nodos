@@ -117,14 +117,19 @@
                     ref="tooltip"
                     class="tooltip"
                     :style="{ ...tooltipPos, opacity: tooltipOpacity }">
-                    <div><strong>ID:</strong> {{ tooltipData.id }}</div>
                     <div><strong>Nombre:</strong> {{ tooltipData.name }}</div>
-                    <div><strong>Posición:</strong> ({{ tooltipData.x }}, {{ tooltipData.y }})</div>
-                    <div><strong>Tamaño:</strong> {{ tooltipData.size }}</div>
-                    <div>
-                        <strong>Color:</strong>
-                        <span :style="{ color: tooltipData.color }">{{ tooltipData.color }}</span>
+                    <div v-if="tooltipData.data">
+                        <div><strong>RUT:</strong> {{ tooltipData.data.rut }}</div>
+                        <div><strong>Tipo:</strong> {{ tooltipData.data.tipo }}</div>
+                        <div v-if="tooltipData.data.capitalEnterado">
+                            <strong>Capital Enterado:</strong>
+                            {{ tooltipData.data.capitalEnterado }}
+                        </div>
+                        <div v-if="tooltipData.data.lineaNegocio">
+                            <strong>Línea de Negocio:</strong> {{ tooltipData.data.lineaNegocio }}
+                        </div>
                     </div>
+                    <div><strong>Posición:</strong> ({{ tooltipData.x }}, {{ tooltipData.y }})</div>
                 </div>
             </div>
         </div>
@@ -172,11 +177,11 @@
     import { VNetworkGraph } from "v-network-graph"; // Importa el componente VNetworkGraph específicamente
     import data from "../data"; // Asegúrate de que 'data' esté exportado correctamente desde '../data'
     import { Download } from "@element-plus/icons"; // Importa el ícono 'Download' de Element Plus
-    import { addHotPinkNode } from "../data"; // Asegúrate de que 'addHotPinkNode' esté correctamente exportado desde '../data'
+    //import { addHotPinkNode } from "../data"; // Asegúrate de que 'addHotPinkNode' esté correctamente exportado desde '../data'
 
-    const addHotPinkNodeHandler = () => {
-        addHotPinkNode(nodes, nextNodeIndex); // Llama a la función pasando los nodos y el índice del siguiente nodo
-    };
+    // const addHotPinkNodeHandler = () => {
+    //     addHotPinkNode(nodes, nextNodeIndex); // Llama a la función pasando los nodos y el índice del siguiente nodo
+    // };
     // Código adicional aquí para la lógica de tu componente
 
     const nodes = reactive({ ...data.nodes });
@@ -224,6 +229,7 @@
     );
 
     /// **Eventos del grafo**
+    // Event Handlers
     const eventHandlers: vNG.EventHandlers = {
         "node:pointerover": ({ node }) => {
             const nodeData = nodes[node];
@@ -236,8 +242,7 @@
                     name: nodeData.name || `Nodo sin nombre (${node})`,
                     x: nodeLayout.x,
                     y: nodeLayout.y,
-                    size: nodeData.size,
-                    color: nodeData.color,
+                    data: nodeData.data, // Añadimos los datos para el tooltip
                 };
                 // Mostrar tooltip
                 tooltipOpacity.value = 1;
