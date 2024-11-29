@@ -111,7 +111,34 @@
                     :configs="configs"
                     @node-moved="onNodeMoved"
                     :event-handlers="eventHandlers"
-                    ref="graph" />
+                    ref="graph">
+                    <!-- Definir la fuente de Material Icons -->
+                    <defs>
+                        <component is="style">
+                            @font-face { font-family: 'Material Icons'; font-style: normal;
+                            font-weight: 400; src:
+                            url(https://fonts.gstatic.com/s/materialicons/v97/flUhRq6tzZclQEJ-Vdg-IuiaDsNcIhQ8tQ.woff2)
+                            format('woff2'); }
+                        </component>
+                    </defs>
+
+                    <!-- Sobrescribir el nodo para incluir el ícono -->
+                    <template #override-node="{ nodeId, scale, config, ...slotProps }">
+                        <circle
+                            :r="config.radius * scale"
+                            :fill="config.color"
+                            v-bind="slotProps" />
+                        <text
+                            font-family="Material Icons"
+                            :font-size="22 * scale"
+                            fill="#ffffff"
+                            text-anchor="middle"
+                            dominant-baseline="central"
+                            style="pointer-events: none"
+                            v-html="nodes[nodeId].icon" />
+                    </template>
+                </v-network-graph>
+
                 <!-- Tooltip dinámico para nodos -->
                 <div
                     ref="tooltip"

@@ -19,10 +19,11 @@ interface Node {
   name: string;
   x: number;
   y: number;
-  size: number; // Definir el tamaño
-  color: string; // Definir el color
+  size: number;
+  color: string;
   label?: boolean;
-  data?: NodeData; // Añadir esta línea para incluir la propiedad 'data'
+  data?: NodeData;
+  icon?: string; // Añadir esta línea para incluir la propiedad 'icon'
 }
 
 // Interfaz del borde
@@ -97,7 +98,11 @@ const grupoEmpresarialData = {
 
 // Función para cargar los nodos y aristas desde el JSON
 function loadNodesFromJson() {
-  const grupoEmpresarial = grupoEmpresarialData.grupoEmpresarial;
+    const grupoEmpresarial = grupoEmpresarialData.grupoEmpresarial;
+
+    // Código Unicode de los íconos (Material Icons)
+  const warehouseIcon = "&#xe8b8;"; // Código del ícono Warehouse
+  const userIcon = "&#xe7fd;"; // Código del ícono User
 
   // Crear nodo padre
   const parentId = `node${grupoEmpresarial.id}`;
@@ -106,8 +111,9 @@ function loadNodesFromJson() {
     x: 0,
     y: 0,
     size: 25,
-    color: "#eb510d", // Color para nodos padres
+    color: "#eb510d",
     label: true,
+    icon: warehouseIcon, // Agregar el ícono Warehouse al nodo padre
     data: {
       id: grupoEmpresarial.id,
       nombre: grupoEmpresarial.nombre,
@@ -121,13 +127,14 @@ function loadNodesFromJson() {
   // Crear nodos hijos y aristas
   grupoEmpresarial.empresas.forEach((empresa, index) => {
     const childId = `node${index + 2}`; // Aseguramos que los IDs no se repitan
-    nodes[childId] = {
+   nodes[childId] = {
       name: empresa.nombre,
-      x: 200 * (index + 1), // Posición X ajustada
-      y: 150, // Posición Y fija para todos los hijos
+      x: 200 * (index + 1),
+      y: 150,
       size: 15,
-      color: "#0064a0", // Color para nodos hijos
+      color: "#0064a0",
       label: true,
+      icon: userIcon, // Agregar el ícono User a los nodos hijos
       data: {
         rut: empresa.rut,
         nombre: empresa.nombre,
