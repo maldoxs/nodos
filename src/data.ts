@@ -1,4 +1,4 @@
-import { reactive, watchEffect } from 'vue';
+import { onMounted, reactive, watchEffect } from 'vue';
 import { Nodes, Edges, Layouts, defineConfigs } from 'v-network-graph';
 import * as vNG from "v-network-graph";
 
@@ -48,7 +48,7 @@ const initialLayouts = savedLayouts ? JSON.parse(savedLayouts) : {
 
 // JSON proporcionado
 const grupoEmpresarialData = {
-  "grupoEmpresarial": {
+ "grupoEmpresarial": {
     "id": 1,
     "nombre": "Grupo Empresarial XYZ",
     "rut": "12345678-9",
@@ -67,12 +67,12 @@ const grupoEmpresarialData = {
             "empresa": {
               "rut": "12345678-9",
               "nombre": "Grupo Empresarial XYZ S.A.",
-              "tipo": "Matriz",
+              "tipo": "Matriz"
             },
             "porcentajeParticipacion": 60,
-            "porcentajeParticipacionUtilidades": 70,
-          },
-        ],
+            "porcentajeParticipacionUtilidades": 70
+          }
+        ]
       },
       {
         "rut": "34567890-1",
@@ -85,35 +85,180 @@ const grupoEmpresarialData = {
             "empresa": {
               "rut": "12345678-9",
               "nombre": "Grupo Empresarial XYZ S.A.",
-              "tipo": "Matriz",
+              "tipo": "Matriz"
             },
             "porcentajeParticipacion": 80,
-            "porcentajeParticipacionUtilidades": 50,
-          },
-        ],
+            "porcentajeParticipacionUtilidades": 50
+          }
+        ]
       },
-    ],
-  },
+      {
+        "rut": "45678901-2",
+        "nombre": "XYZ Innovación S.A.",
+        "tipo": "Operativa",
+        "capitalEnterado": 3000000,
+        "lineaNegocio": "Desarrollo de tecnología y soluciones innovadoras",
+        "participaciones": [
+          {
+            "empresa": {
+              "rut": "12345678-9",
+              "nombre": "Grupo Empresarial XYZ S.A.",
+              "tipo": "Matriz"
+            },
+            "porcentajeParticipacion": 50,
+            "porcentajeParticipacionUtilidades": 60
+          }
+        ]
+      },
+      {
+        "rut": "56789012-3",
+        "nombre": "XYZ Servicios Financieros S.A.",
+        "tipo": "Operativa",
+        "capitalEnterado": 1500000,
+        "lineaNegocio": "Servicios de asesoría financiera",
+        "participaciones": [
+          {
+            "empresa": {
+              "rut": "12345678-9",
+              "nombre": "Grupo Empresarial XYZ S.A.",
+              "tipo": "Matriz"
+            },
+            "porcentajeParticipacion": 70,
+            "porcentajeParticipacionUtilidades": 80
+          }
+        ]
+      },
+      {
+        "rut": "67890123-4",
+        "nombre": "XYZ Logística S.A.",
+        "tipo": "Operativa",
+        "capitalEnterado": 4000000,
+        "lineaNegocio": "Servicios logísticos y transporte",
+        "participaciones": [
+          {
+            "empresa": {
+              "rut": "12345678-9",
+              "nombre": "Grupo Empresarial XYZ S.A.",
+              "tipo": "Matriz"
+            },
+            "porcentajeParticipacion": 65,
+            "porcentajeParticipacionUtilidades": 75
+          }
+        ]
+      },
+      {
+        "rut": "78901234-5",
+        "nombre": "XYZ Comercio Exterior S.A.",
+        "tipo": "Operativa",
+        "capitalEnterado": 3500000,
+        "lineaNegocio": "Comercio exterior y exportaciones",
+        "participaciones": [
+          {
+            "empresa": {
+              "rut": "12345678-9",
+              "nombre": "Grupo Empresarial XYZ S.A.",
+              "tipo": "Matriz"
+            },
+            "porcentajeParticipacion": 55,
+            "porcentajeParticipacionUtilidades": 65
+          }
+        ]
+      },
+      {
+        "rut": "89012345-6",
+        "nombre": "XYZ Energía Renovable S.A.",
+        "tipo": "Operativa",
+        "capitalEnterado": 6000000,
+        "lineaNegocio": "Energía renovable y sostenible",
+        "participaciones": [
+          {
+            "empresa": {
+              "rut": "12345678-9",
+              "nombre": "Grupo Empresarial XYZ S.A.",
+              "tipo": "Matriz"
+            },
+            "porcentajeParticipacion": 45,
+            "porcentajeParticipacionUtilidades": 70
+          }
+        ]
+      },
+      {
+        "rut": "90123456-7",
+        "nombre": "XYZ Telecomunicaciones S.A.",
+        "tipo": "Operativa",
+        "capitalEnterado": 2500000,
+        "lineaNegocio": "Servicios de telecomunicaciones",
+        "participaciones": [
+          {
+            "empresa": {
+              "rut": "12345678-9",
+              "nombre": "Grupo Empresarial XYZ S.A.",
+              "tipo": "Matriz"
+            },
+            "porcentajeParticipacion": 85,
+            "porcentajeParticipacionUtilidades": 90
+          }
+        ]
+      },
+      {
+        "rut": "01234567-8",
+        "nombre": "XYZ Automotriz S.A.",
+        "tipo": "Operativa",
+        "capitalEnterado": 8000000,
+        "lineaNegocio": "Fabricación de vehículos y autopartes",
+        "participaciones": [
+          {
+            "empresa": {
+              "rut": "12345678-9",
+              "nombre": "Grupo Empresarial XYZ S.A.",
+              "tipo": "Matriz"
+            },
+            "porcentajeParticipacion": 60,
+            "porcentajeParticipacionUtilidades": 75
+          }
+        ]
+      },
+      {
+        "rut": "12345678-9",
+        "nombre": "XYZ Inmobiliaria S.A.",
+        "tipo": "Operativa",
+        "capitalEnterado": 4500000,
+        "lineaNegocio": "Desarrollo inmobiliario",
+        "participaciones": [
+          {
+            "empresa": {
+              "rut": "12345678-9",
+              "nombre": "Grupo Empresarial XYZ S.A.",
+              "tipo": "Matriz"
+            },
+            "porcentajeParticipacion": 90,
+            "porcentajeParticipacionUtilidades": 85
+          }
+        ]
+      }
+    ]
+}
+
 };
 
 // Función para cargar los nodos y aristas desde el JSON
 function loadNodesFromJson() {
-    const grupoEmpresarial = grupoEmpresarialData.grupoEmpresarial;
+  const grupoEmpresarial = grupoEmpresarialData.grupoEmpresarial;
 
-    // Código Unicode de los íconos (Material Icons)
-  const warehouseIcon = "&#xe8b8;"; // Código del ícono Warehouse
-  const userIcon = "&#xe7fd;"; // Código del ícono User
+  const warehouseIcon = "&#xe8b8;";
+  const userIcon = "&#xe7fd;";
 
-  // Crear nodo padre
-  const parentId = `node${grupoEmpresarial.id}`;
+  // Crear o actualizar nodo padre
+  const parentId = `node-${grupoEmpresarial.id}`;
   nodes[parentId] = {
+    ...nodes[parentId],
     name: grupoEmpresarial.nombre,
-    x: 0,
-    y: 0,
+    x: nodes[parentId]?.x || 0,
+    y: nodes[parentId]?.y || 0,
     size: 25,
     color: "#eb510d",
     label: true,
-    icon: warehouseIcon, // Agregar el ícono Warehouse al nodo padre
+    icon: warehouseIcon,
     data: {
       id: grupoEmpresarial.id,
       nombre: grupoEmpresarial.nombre,
@@ -124,18 +269,20 @@ function loadNodesFromJson() {
     },
   };
 
-  // Crear nodos hijos y aristas
-  grupoEmpresarial.empresas.forEach((empresa, index) => {
-    const childId = `node${index + 2}`; // Aseguramos que los IDs no se repitan
-   nodes[childId] = {
+  // Crear o actualizar nodos hijos y aristas
+  grupoEmpresarial.empresas.forEach((empresa) => {
+    const childId = `node-${empresa.rut}`;
+    nodes[childId] = {
+      ...nodes[childId],
       name: empresa.nombre,
-      x: 200 * (index + 1),
-      y: 150,
+      x: nodes[childId]?.x || Math.random() * 400,
+      y: nodes[childId]?.y || Math.random() * 400,
       size: 15,
       color: "#0064a0",
       label: true,
-      icon: userIcon, // Agregar el ícono User a los nodos hijos
+      icon: userIcon,
       data: {
+        id: empresa.id,
         rut: empresa.rut,
         nombre: empresa.nombre,
         tipo: empresa.tipo,
@@ -154,9 +301,10 @@ function loadNodesFromJson() {
     const porcentajeParticipacionUtilidades =
       participacion?.porcentajeParticipacionUtilidades ?? 0;
 
-    // Crear arista entre el nodo padre y el nodo hijo, incluyendo los porcentajes
-    const edgeId = `edge${index + 1}`;
+    // Crear o actualizar la arista
+    const edgeId = `edge-${parentId}-${childId}`;
     edges[edgeId] = {
+      ...edges[edgeId],
       source: parentId,
       target: childId,
       color: "#002C48",
@@ -165,6 +313,9 @@ function loadNodesFromJson() {
     };
   });
 }
+
+
+
 
 // Llamamos a la función para cargar los nodos desde el JSON
 loadNodesFromJson();
@@ -186,16 +337,10 @@ Object.keys(nodes).forEach((nodeId) => {
 });
 
 // Función para actualizar la posición de un nodo en layouts
-const updateNodePosition = (
-  nodeId: string,
-  newPosition: { x: number; y: number }
-) => {
-  if (layouts.nodes[nodeId]) {
-    layouts.nodes[nodeId].x = newPosition.x;
-    layouts.nodes[nodeId].y = newPosition.y;
-    // Guardar los nuevos layouts en localStorage
-    localStorage.setItem('layouts', JSON.stringify(layouts));
-  }
+const updateNodePosition = (nodeId, newPosition) => {
+  layouts.nodes[nodeId] = { x: newPosition.x, y: newPosition.y };
+  // Guardar los nuevos layouts en localStorage
+  localStorage.setItem('layouts', JSON.stringify(layouts));
 };
 
 // Verificar cambios en layouts y actualizar localStorage automáticamente
@@ -245,6 +390,16 @@ const configs = reactive(
     },
   })
 );
+
+onMounted(() => {
+  loadNodesFromJson();
+  // Cargar layouts guardados
+  const savedLayouts = localStorage.getItem('layouts');
+  if (savedLayouts) {
+    const parsedLayouts = JSON.parse(savedLayouts);
+    Object.assign(layouts.nodes, parsedLayouts.nodes);
+  }
+});
 
 export default {
   nodes,

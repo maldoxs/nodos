@@ -323,19 +323,15 @@
             const nodeLayout = layouts.nodes[node];
 
             if (nodeData && nodeLayout) {
-                // Actualiza los datos del tooltip
                 tooltipData.value = {
                     id: node,
                     name: nodeData.name || `Nodo sin nombre (${node})`,
-                    x: nodeLayout.x,
-                    y: nodeLayout.y,
-                    data: nodeData.data, // Añadimos los datos para el tooltip
+                    x: nodeLayout.x.toFixed(2),
+                    y: nodeLayout.y.toFixed(2),
+                    data: nodeData.data, // Asegúrate de incluir 'data'
                 };
-                // Mostrar tooltip
                 tooltipOpacity.value = 1;
-                // Establecer el ID del nodo objetivo
                 targetNodeId.value = node;
-                // Calcular posición del tooltip
                 updateTooltipPosition();
             }
         },
@@ -386,12 +382,18 @@
     });
 
     // Sincronización de nodos y layouts
-    const onNodeMoved = (nodeId: string, newPosition: { x: number; y: number }) => {
-        if (nodes[nodeId]) {
-            nodes[nodeId].x = newPosition.x;
-            nodes[nodeId].y = newPosition.y;
-            layouts.nodes[nodeId] = { x: newPosition.x, y: newPosition.y };
-        }
+    // const onNodeMoved = (nodeId: string, newPosition: { x: number; y: number }) => {
+    //     if (nodes[nodeId]) {
+    //         nodes[nodeId].x = newPosition.x;
+    //         nodes[nodeId].y = newPosition.y;
+    //         layouts.nodes[nodeId] = { x: newPosition.x, y: newPosition.y };
+    //     }
+    // };
+
+    const onNodeMoved = (nodeId, newPosition) => {
+        layouts.nodes[nodeId] = { ...newPosition };
+        nodes[nodeId].x = newPosition.x;
+        nodes[nodeId].y = newPosition.y;
     };
 
     async function downloadAsSvg() {
