@@ -112,7 +112,7 @@
                     @node-moved="onNodeMoved"
                     :event-handlers="eventHandlers"
                     ref="graph" />
-                <!-- Tooltip dinámico -->
+                <!-- Tooltip dinámico para nodos -->
                 <div
                     ref="tooltip"
                     class="tooltip"
@@ -130,6 +130,24 @@
                         </div>
                     </div>
                     <div><strong>Posición:</strong> ({{ tooltipData.x }}, {{ tooltipData.y }})</div>
+                </div>
+
+                <!-- Tooltip dinámico para aristas -->
+                <div
+                    ref="edgeTooltip"
+                    class="tooltip"
+                    :style="{ ...edgeTooltipPos, opacity: edgeTooltipOpacity }">
+                    <div>
+                        <strong>{{ edgeTooltipData.name }}</strong>
+                    </div>
+                    <div v-if="edgeTooltipData.porcentajeParticipacion !== undefined">
+                        <strong>Porcentaje de Participación:</strong>
+                        {{ edgeTooltipData.porcentajeParticipacion }}%
+                    </div>
+                    <div v-if="edgeTooltipData.porcentajeParticipacionUtilidades !== undefined">
+                        <strong>Porcentaje de Utilidades:</strong>
+                        {{ edgeTooltipData.porcentajeParticipacionUtilidades }}%
+                    </div>
                 </div>
             </div>
         </div>
@@ -173,16 +191,10 @@
 
 <script setup lang="ts">
     import { reactive, ref, onMounted, computed, watch } from "vue"; // Importa funciones de Vue
-    import * as vNG from "v-network-graph"; // Importa todos los elementos de 'v-network-graph' (usa 'vNG' para abreviar)
-    import { VNetworkGraph } from "v-network-graph"; // Importa el componente VNetworkGraph específicamente
-    import data from "../data"; // Asegúrate de que 'data' esté exportado correctamente desde '../data'
+    import * as vNG from "v-network-graph"; // Librería para grafo
+    import { VNetworkGraph } from "v-network-graph"; // Importa las funcionalidades necesarias para crear el grafo.
+    import data from "../data"; // Datos para los nodos y aristas contiene la configuración y los nodos iniciales.
     import { Download } from "@element-plus/icons"; // Importa el ícono 'Download' de Element Plus
-    //import { addHotPinkNode } from "../data"; // Asegúrate de que 'addHotPinkNode' esté correctamente exportado desde '../data'
-
-    // const addHotPinkNodeHandler = () => {
-    //     addHotPinkNode(nodes, nextNodeIndex); // Llama a la función pasando los nodos y el índice del siguiente nodo
-    // };
-    // Código adicional aquí para la lógica de tu componente
 
     const nodes = reactive({ ...data.nodes });
     const edges = reactive({ ...data.edges });
@@ -194,20 +206,38 @@
 
     const layouts = reactive(data.layouts);
 
-    // Tooltip dinámico
+    // Tooltip dinámico para nodos
     const tooltip = ref<HTMLDivElement>();
     const tooltipData = ref<Record<string, any>>({});
     const tooltipOpacity = ref(0);
     const tooltipPos = ref({ left: "0px", top: "0px" });
     const targetNodeId = ref<string>("");
 
-    const graph = ref<vNG.Instance | null>(null); // Inicializar con null
-    // Reemplazar el cálculo de la posición del nodo en el tooltip
-    const targetNodePos = computed(() => {
-        // Comprueba si el nodo existe en layouts.nodes
+    // Tooltip dinámico para aristas
+    const edgeTooltip = ref<HTMLDivElement>();
+    const edgeTooltipData = ref<Record<string, any>>({});
+    const edgeTooltipOpacity = ref(0);
+    const edgeTooltipPos = ref({ left: "0px", top: "0px" });
+    const targetEdgeId = ref<string>("");
+
+    const graph = ref<vNG.Instance | null>(null);
+
+    // **Actualizar posición del tooltip para nodos**
+    const updateTooltipPosition = () => {
+        if (!graph.value || !tooltip.value || !targetNodeId.value) return;
+
         const nodeLayout = layouts.nodes[targetNodeId.value];
-        return nodeLayout ? { x: nodeLayout.x, y: nodeLayout.y } : { x: 0, y: 0 };
-    });
+        if (!nodeLayout) return;
+
+        // Mapeo de coordenadas SVG a DOM
+        const domPoint = graph.value.translateFromSvgToDomCoordinates(nodeLayout);
+
+        // Ajustar posición del tooltip
+        tooltipPos.value = {
+            left: `${domPoint.x - tooltip.value.offsetWidth / 2}px`,
+            top: `${domPoint.y - tooltip.value.offsetHeight - 20}px`,
+        };
+    };
 
     // Reemplazar el cálculo de la posición del nodo en el tooltip
     // Actualiza la lógica del watch para reutilizar targetNodePos
@@ -228,7 +258,37 @@
         }
     );
 
-    /// **Eventos del grafo**
+    // ArmaNodo.vue
+
+    // **Actualizar posición del tooltip para aristas**
+    const updateEdgeTooltipPosition = () => {
+        if (!graph.value || !edgeTooltip.value || !targetEdgeId.value) return;
+
+        const edgeData = edges[targetEdgeId.value];
+        if (!edgeData) return;
+
+        const sourcePos = layouts.nodes[edgeData.source];
+        const targetPos = layouts.nodes[edgeData.target];
+
+        // Aseguramos que sourcePos y targetPos existen
+        if (!sourcePos || !targetPos) return;
+
+        // Calcular la posición central de la arista
+        const edgeCenter = {
+            x: (sourcePos.x + targetPos.x) / 2,
+            y: (sourcePos.y + targetPos.y) / 2,
+        };
+
+        // Mapeo de coordenadas SVG a DOM
+        const domPoint = graph.value.translateFromSvgToDomCoordinates(edgeCenter);
+
+        // Ajustar posición del tooltip
+        edgeTooltipPos.value = {
+            left: `${domPoint.x - edgeTooltip.value.offsetWidth / 2}px`,
+            top: `${domPoint.y - edgeTooltip.value.offsetHeight - 20}px`,
+        };
+    };
+
     // Event Handlers
     const eventHandlers: vNG.EventHandlers = {
         "node:pointerover": ({ node }) => {
@@ -246,28 +306,43 @@
                 };
                 // Mostrar tooltip
                 tooltipOpacity.value = 1;
+                // Establecer el ID del nodo objetivo
+                targetNodeId.value = node;
                 // Calcular posición del tooltip
-                updateTooltipPosition(nodeLayout);
+                updateTooltipPosition();
             }
         },
         "node:pointerout": () => {
             tooltipOpacity.value = 0; // Ocultar tooltip
         },
-    };
+        "edge:pointerover": (event: vNG.EdgeEvent<PointerEvent>) => {
+            const edge = event.edge;
+            if (!edge) return; // Si 'edge' es undefined, salimos del manejador
 
-    // **Actualizar posición del tooltip**
-    const updateTooltipPosition = (nodeLayout: { x: number; y: number }) => {
-        if (!graph.value) return;
+            const edgeData = edges[edge];
+            if (edgeData) {
+                const sourceNode = nodes[edgeData.source];
+                const targetNode = nodes[edgeData.target];
 
-        // Mapea coordenadas SVG a DOM
-        const domPoint = graph.value.translateFromSvgToDomCoordinates(nodeLayout);
+                if (sourceNode && targetNode) {
+                    // Actualizar los datos del tooltip de la arista
+                    edgeTooltipData.value = {
+                        id: edge,
+                        name: `Conexión entre ${sourceNode.name} y ${targetNode.name}`,
+                        porcentajeParticipacion: edgeData.porcentajeParticipacion,
+                        porcentajeParticipacionUtilidades:
+                            edgeData.porcentajeParticipacionUtilidades,
+                    };
+                    targetEdgeId.value = edge;
+                    edgeTooltipOpacity.value = 1; // Mostrar tooltip
+                    updateEdgeTooltipPosition();
+                }
+            }
+        },
 
-        // Ajusta posición del tooltip para que quede arriba del nodo
-        const offsetY = 140; // Desplazamiento hacia arriba (ajusta según el tamaño de tus nodos y tooltip)
-        tooltipPos.value = {
-            left: `${domPoint.x}px`,
-            top: `${domPoint.y - offsetY}px`,
-        };
+        "edge:pointerout": () => {
+            edgeTooltipOpacity.value = 0; // Ocultar tooltip
+        },
     };
 
     // Configuración del grafo
@@ -335,10 +410,24 @@
             return;
         }
         const [source, target] = selectedNodes.value;
-        const edgeId = `edge${nextEdgeIndex.value}`; // Corregido: añadiendo comillas
-        // Definir el color de la arista
-        const edgeColor = "#002C48"; // Puedes cambiar el color según sea necesario
-        edges[edgeId] = { source, target, color: edgeColor };
+        const edgeId = `edge${nextEdgeIndex.value}`;
+        const edgeColor = "#002C48";
+
+        // Solicitar porcentajes al usuario
+        const porcentajeParticipacion = parseFloat(
+            prompt("Ingrese el porcentaje de participación:", "0") || "0"
+        );
+        const porcentajeParticipacionUtilidades = parseFloat(
+            prompt("Ingrese el porcentaje de participación en utilidades:", "0") || "0"
+        );
+
+        edges[edgeId] = {
+            source,
+            target,
+            color: edgeColor,
+            porcentajeParticipacion,
+            porcentajeParticipacionUtilidades,
+        };
         nextEdgeIndex.value++;
     };
 
@@ -381,15 +470,17 @@
                 nextEdgeIndex: savedEdgeIndex,
             } = JSON.parse(savedGraphState);
 
-            // Restaurar nodos y aristas de forma reactiva
+            // Combinar nodos
             for (const nodeId in savedNodes) {
-                nodes[nodeId] = savedNodes[nodeId];
-            }
-            for (const edgeId in savedEdges) {
-                edges[edgeId] = savedEdges[edgeId];
+                nodes[nodeId] = { ...nodes[nodeId], ...savedNodes[nodeId] };
             }
 
-            // Restaurar los índices para evitar la sobrescritura
+            // Combinar aristas
+            for (const edgeId in savedEdges) {
+                edges[edgeId] = { ...edges[edgeId], ...savedEdges[edgeId] };
+            }
+
+            // Restaurar los índices
             nextNodeIndex.value = savedNodeIndex;
             nextEdgeIndex.value = savedEdgeIndex;
 

@@ -1,6 +1,6 @@
-import { reactive, watchEffect } from 'vue'
-import { Nodes, Edges, Layouts, defineConfigs } from 'v-network-graph'
-import * as vNG from "v-network-graph"
+import { reactive, watchEffect } from 'vue';
+import { Nodes, Edges, Layouts, defineConfigs } from 'v-network-graph';
+import * as vNG from "v-network-graph";
 
 // Definir una interfaz para los datos adicionales del nodo
 interface NodeData {
@@ -29,7 +29,11 @@ interface Node {
 interface Edge extends vNG.Edge {
   color: string;
   dashed?: boolean;
+  porcentajeParticipacion?: number;
+  porcentajeParticipacionUtilidades?: number;
 }
+
+
 
 // Nodos y aristas reactivos
 const nodes = reactive<Record<string, Node>>({});
@@ -38,7 +42,7 @@ const edges: Edges = reactive({});
 // Recuperar el objeto layouts del localStorage o establecer valores predeterminados
 const savedLayouts = localStorage.getItem('layouts');
 const initialLayouts = savedLayouts ? JSON.parse(savedLayouts) : {
-  nodes: {}
+  nodes: {},
 };
 
 // JSON proporcionado
@@ -62,12 +66,12 @@ const grupoEmpresarialData = {
             "empresa": {
               "rut": "12345678-9",
               "nombre": "Grupo Empresarial XYZ S.A.",
-              "tipo": "Matriz"
+              "tipo": "Matriz",
             },
             "porcentajeParticipacion": 60,
-            "porcentajeParticipacionUtilidades": 70
-          }
-        ]
+            "porcentajeParticipacionUtilidades": 70,
+          },
+        ],
       },
       {
         "rut": "34567890-1",
@@ -80,15 +84,15 @@ const grupoEmpresarialData = {
             "empresa": {
               "rut": "12345678-9",
               "nombre": "Grupo Empresarial XYZ S.A.",
-              "tipo": "Matriz"
+              "tipo": "Matriz",
             },
             "porcentajeParticipacion": 80,
-            "porcentajeParticipacionUtilidades": 50
-          }
-        ]
-      }
-    ]
-  }
+            "porcentajeParticipacionUtilidades": 50,
+          },
+        ],
+      },
+    ],
+  },
 };
 
 // Función para cargar los nodos y aristas desde el JSON
@@ -110,8 +114,8 @@ function loadNodesFromJson() {
       rut: grupoEmpresarial.rut,
       tipo: grupoEmpresarial.tipo,
       capitalEnterado: grupoEmpresarial.capitalEnterado,
-      lineaNegocio: grupoEmpresarial.lineaNegocio
-    }
+      lineaNegocio: grupoEmpresarial.lineaNegocio,
+    },
   };
 
   // Crear nodos hijos y aristas
@@ -130,16 +134,27 @@ function loadNodesFromJson() {
         tipo: empresa.tipo,
         capitalEnterado: empresa.capitalEnterado,
         lineaNegocio: empresa.lineaNegocio,
-        participaciones: empresa.participaciones
-      }
+        participaciones: empresa.participaciones,
+      },
     };
 
-    // Crear arista entre el nodo padre y el nodo hijo
+    // Obtener los porcentajes de participación
+    const participacion = empresa.participaciones?.find(
+      (p) => p.empresa.rut === grupoEmpresarial.rut
+    );
+
+    const porcentajeParticipacion = participacion?.porcentajeParticipacion ?? 0;
+    const porcentajeParticipacionUtilidades =
+      participacion?.porcentajeParticipacionUtilidades ?? 0;
+
+    // Crear arista entre el nodo padre y el nodo hijo, incluyendo los porcentajes
     const edgeId = `edge${index + 1}`;
     edges[edgeId] = {
       source: parentId,
       target: childId,
-      color: "#002C48"
+      color: "#002C48",
+      porcentajeParticipacion,
+      porcentajeParticipacionUtilidades,
     };
   });
 }
@@ -149,11 +164,11 @@ loadNodesFromJson();
 
 // Layouts reactivos
 const layouts: Layouts = reactive({
-  nodes: {}
+  nodes: {},
 });
 
 // Asignar posiciones guardadas o por defecto
-Object.keys(nodes).forEach(nodeId => {
+Object.keys(nodes).forEach((nodeId) => {
   if (initialLayouts.nodes[nodeId]) {
     // Si hay posiciones guardadas, las usamos
     layouts.nodes[nodeId] = initialLayouts.nodes[nodeId];
@@ -164,7 +179,10 @@ Object.keys(nodes).forEach(nodeId => {
 });
 
 // Función para actualizar la posición de un nodo en layouts
-const updateNodePosition = (nodeId: string, newPosition: { x: number, y: number }) => {
+const updateNodePosition = (
+  nodeId: string,
+  newPosition: { x: number; y: number }
+) => {
   if (layouts.nodes[nodeId]) {
     layouts.nodes[nodeId].x = newPosition.x;
     layouts.nodes[nodeId].y = newPosition.y;
@@ -175,7 +193,7 @@ const updateNodePosition = (nodeId: string, newPosition: { x: number, y: number 
 
 // Verificar cambios en layouts y actualizar localStorage automáticamente
 watchEffect(() => {
-  localStorage.setItem('layouts', JSON.stringify(layouts))
+  localStorage.setItem('layouts', JSON.stringify(layouts));
 });
 
 // Configuración reactiva de los nodos y bordes
@@ -184,16 +202,16 @@ const configs = reactive(
     node: {
       normal: {
         type: "circle",
-        radius: node => node.size,
-        color: node => node.color,
+        radius: (node) => node.size,
+        color: (node) => node.color,
       },
       hover: {
-        radius: node => node.size + 2,
-        color: node => node.color,
+        radius: (node) => node.size + 2,
+        color: (node) => node.color,
       },
       selectable: true,
       label: {
-        visible: node => !!node.label,
+        visible: (node) => !!node.label,
         directionAutoAdjustment: true,
         fontSize: 15,
         color: 'black',
@@ -207,8 +225,8 @@ const configs = reactive(
     edge: {
       normal: {
         width: 2,
-        color: edge => edge.color,
-        dasharray: edge => (edge.dashed ? "4" : "0"),
+        color: (edge) => edge.color,
+        dasharray: (edge) => (edge.dashed ? "4" : "0"),
       },
       selectable: true,
       marker: {
