@@ -11,11 +11,11 @@
                         <div class="p-3 bg-light rounded shadow-sm">
                             <h6 class="text-primary mb-3"><strong>Gestión de Nodos</strong></h6>
                             <div class="d-flex flex-wrap gap-2">
-                                <button
+                                <!-- <button
                                     class="btn btn-warning btn-sm px-3 text-white"
                                     @click="addHotPinkNodeHandler">
                                     <i class="fas fa-plus-circle me-1"></i> Nodo Padre
-                                </button>
+                                </button> -->
                                 <button class="btn btn-primary btn-sm px-3" @click="addNode">
                                     <i class="fas fa-plus-circle me-1"></i> Nodo Hijo
                                 </button>
