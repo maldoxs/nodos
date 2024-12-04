@@ -11,11 +11,6 @@
                         <div class="p-3 bg-light rounded shadow-sm">
                             <h6 class="text-primary mb-3"><strong>Gestión de Nodos</strong></h6>
                             <div class="d-flex flex-wrap gap-2">
-                                <!-- <button
-                                    class="btn btn-warning btn-sm px-3 text-white"
-                                    @click="addHotPinkNodeHandler">
-                                    <i class="fas fa-plus-circle me-1"></i> Nodo Padre
-                                </button> -->
                                 <button class="btn btn-primary btn-sm px-3" @click="addNode">
                                     <i class="fas fa-plus-circle me-1"></i> Nodo Hijo
                                 </button>
@@ -47,6 +42,15 @@
                                     <i class="fas fa-unlink me-1"></i> Eliminar Arista
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                    <!-- Checkbox para habilitar Force Layout -->
+                    <div class="col-md-6 mt-3">
+                        <div class="p-3 bg-light rounded shadow-sm">
+                            <h6 class="text-primary mb-3">
+                                <strong>Configuración de Layout</strong>
+                            </h6>
+                            <el-checkbox v-model="d3ForceEnabled" label="D3-Force enabled" />
                         </div>
                     </div>
 
@@ -96,7 +100,6 @@
         <div></div>
 
         <div>
-            <!-- <el-button @click="addHotPinkNodeHandler">Add HotPink</el-button> -->
             <!-- Aquí podrías tener el componente de la red que utiliza los nodos configurados -->
         </div>
 
@@ -217,21 +220,84 @@
 </template>
 
 <script setup lang="ts">
-    import { reactive, ref, onMounted, computed, watch } from "vue"; // Importa funciones de Vue
-    import * as vNG from "v-network-graph"; // Librería para grafo
-    import { VNetworkGraph } from "v-network-graph"; // Importa las funcionalidades necesarias para crear el grafo.
+    import { reactive, ref, onMounted, computed, watchEffect, watch } from "vue";
+    import * as vNG from "v-network-graph";
+    import { ForceLayout } from "v-network-graph/lib/force-layout"; // Importar ForceLayout para el diseño forzado
+    import { Download } from "@element-plus/icons"; // Importar el ícono 'Download' de Element Plus
     import data from "../data"; // Datos para los nodos y aristas contiene la configuración y los nodos iniciales.
-    import { Download } from "@element-plus/icons"; // Importa el ícono 'Download' de Element Plus
 
     const nodes = reactive({ ...data.nodes });
     const edges = reactive({ ...data.edges });
+    const layouts = reactive(data.layouts);
+
     const nextNodeIndex = ref(Object.keys(nodes).length + 1);
     const nextEdgeIndex = ref(Object.keys(edges).length + 1);
     const selectedNodes = ref<string[]>([]);
     const selectedEdges = ref<string[]>([]);
     const newNodeName = ref<string>("");
+    const graph = ref<vNG.Instance | null>(null);
 
-    const layouts = reactive(data.layouts);
+    // Propiedad computada para habilitar o deshabilitar Force Layout
+    const d3ForceEnabled = computed({
+        get: () => configs.view?.layoutHandler instanceof ForceLayout,
+        set: (value: boolean) => {
+            if (configs.view) {
+                if (value) {
+                    configs.view.layoutHandler = new ForceLayout();
+                } else {
+                    configs.view.layoutHandler = new vNG.SimpleLayout();
+                }
+            }
+        },
+    });
+
+    // Configuración del grafo, incluyendo el handler del layout
+    const configs = reactive(
+        vNG.defineConfigs({
+            view: {
+                layoutHandler: new ForceLayout(), // Se inicializa con ForceLayout por defecto
+                panEnabled: true,
+                zoomEnabled: true,
+            },
+            node: {
+                normal: {
+                    type: "circle",
+                    radius: (node) => node.size,
+                    color: (node) => node.color,
+                },
+                hover: {
+                    radius: (node) => node.size + 2,
+                    color: (node) => node.color,
+                },
+                selectable: true,
+                label: {
+                    visible: (node) => !!node.label,
+                    directionAutoAdjustment: true,
+                    fontSize: 15,
+                    color: "black",
+                    fontFamily: "Arial",
+                    direction: "south",
+                },
+                focusring: {
+                    color: "darkgray",
+                },
+            },
+            edge: {
+                normal: {
+                    width: 2,
+                    color: (edge) => edge.color,
+                    dasharray: (edge) => (edge.dashed ? "4" : "0"),
+                },
+                selectable: true,
+                marker: {
+                    target: { type: "arrow" },
+                },
+                label: {
+                    fontSize: 40,
+                },
+            },
+        })
+    );
 
     // Tooltip dinámico para nodos
     const tooltip = ref<HTMLDivElement>();
@@ -247,9 +313,7 @@
     const edgeTooltipPos = ref({ left: "0px", top: "0px" });
     const targetEdgeId = ref<string>("");
 
-    const graph = ref<vNG.Instance | null>(null);
-
-    // **Actualizar posición del tooltip para nodos**
+    //Actualizar posición del tooltip para nodos**/;
     const updateTooltipPosition = () => {
         if (!graph.value || !tooltip.value || !targetNodeId.value) return;
 
@@ -265,6 +329,18 @@
             top: `${domPoint.y - tooltip.value.offsetHeight - 20}px`,
         };
     };
+
+    watchEffect(() => {
+        localStorage.setItem("layouts", JSON.stringify(layouts));
+    });
+
+    onMounted(() => {
+        const savedLayouts = localStorage.getItem("layouts");
+        if (savedLayouts) {
+            const parsedLayouts = JSON.parse(savedLayouts);
+            Object.assign(layouts.nodes, parsedLayouts.nodes);
+        }
+    });
 
     // Reemplazar el cálculo de la posición del nodo en el tooltip
     // Actualiza la lógica del watch para reutilizar targetNodePos
@@ -284,8 +360,6 @@
             }
         }
     );
-
-    // ArmaNodo.vue
 
     // **Actualizar posición del tooltip para aristas**
     const updateEdgeTooltipPosition = () => {
@@ -367,28 +441,6 @@
             edgeTooltipOpacity.value = 0; // Ocultar tooltip
         },
     };
-
-    // Configuración del grafo
-    const configs = reactive({
-        node: data.configs.node,
-        edge: data.configs.edge,
-        view: {
-            panEnabled: true,
-            zoomEnabled: true,
-            zoomMin: 0.5,
-            zoomMax: 1,
-            backgroundColor: "#f8f9fa",
-        },
-    });
-
-    // Sincronización de nodos y layouts
-    // const onNodeMoved = (nodeId: string, newPosition: { x: number; y: number }) => {
-    //     if (nodes[nodeId]) {
-    //         nodes[nodeId].x = newPosition.x;
-    //         nodes[nodeId].y = newPosition.y;
-    //         layouts.nodes[nodeId] = { x: newPosition.x, y: newPosition.y };
-    //     }
-    // };
 
     const onNodeMoved = (nodeId, newPosition) => {
         layouts.nodes[nodeId] = { ...newPosition };
