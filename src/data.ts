@@ -48,73 +48,225 @@ const initialLayouts = savedLayouts ? JSON.parse(savedLayouts) : {
 
 // JSON proporcionado
 const grupoEmpresarialData = {
-"empresas": [
-    {
-      "rut": "23456789-0",
-      "nombre": "XYZ Producción S.A.",
-      "tipo": "Operativa",
-      "capitalEnterado": 5000000,
-      "lineaNegocio": "Fabricación de productos",
-      "participaciones": [
+    "empresas": [
         {
-          "empresa": {
-            "rut": "34567890-1",
-            "nombre": "XYZ Distribución S.A.",
-            "tipo": "Operativa"
-          },
-          "porcentajeParticipacion": 60,
-          "porcentajeParticipacionUtilidades": 70
-        },
-        {
-          "empresa": {
-            "rut": "45678901-2",
-            "nombre": "XYZ Innovación S.A.",
-            "tipo": "Operativa"
-          },
-          "porcentajeParticipacion": 60,
-          "porcentajeParticipacionUtilidades": 70
-        }
-      ]
-    },
-    {
-      "rut": "34567890-1",
-      "nombre": "XYZ Distribución S.A.",
-      "tipo": "Operativa",
-      "capitalEnterado": 5000000,
-      "lineaNegocio": "Distribución de productos",
-      "participaciones": [
-        {
-          "empresa": {
-            "rut": "45678901-2",
-            "nombre": "XYZ Innovación S.A.",
-            "tipo": "Operativa"
-          },
-          "porcentajeParticipacion": 60,
-          "porcentajeParticipacionUtilidades": 70
-        }
-      ]
-    },
-    {
-      "rut": "45678901-2",
-      "nombre": "XYZ Innovación S.A.",
-      "tipo": "Operativa",
-      "capitalEnterado": 5000000,
-      "lineaNegocio": "Desarrollo de tecnología",
-      "participaciones": [
-        {
-          "empresa": {
             "rut": "23456789-0",
             "nombre": "XYZ Producción S.A.",
-            "tipo": "Operativa"
-          },
-          "porcentajeParticipacion": 60,
-          "porcentajeParticipacionUtilidades": 70
-        }
-      ]
-    }
-  ]
+            "tipo": "Operativa",
+            "capitalEnterado": 5000000,
+            "lineaNegocio": "Fabricación de productos",
+            "participaciones": [
+                {
+                    "empresa": {
+                        "rut": "34567890-1",
+                        "nombre": "XYZ Distribución S.A.",
+                        "tipo": "Operativa"
+                    },
+                    "porcentajeParticipacion": 60,
+                    "porcentajeParticipacionUtilidades": 70
+                },
+                {
+                    "empresa": {
+                        "rut": "45678901-2",
+                        "nombre": "XYZ Innovación S.A.",
+                        "tipo": "Operativa"
+                    },
+                    "porcentajeParticipacion": 60,
+                    "porcentajeParticipacionUtilidades": 70
+                },
+                {
+                    "empresa": {
+                        "rut": "56789012-3",
+                        "nombre": "XYZ Nuevos Productos S.A.",
+                        "tipo": "Operativa"
+                    },
+                    "porcentajeParticipacion": 50,
+                    "porcentajeParticipacionUtilidades": 60
+                },
+                {
+                    "empresa": {
+                        "rut": "67890123-4",
+                        "nombre": "XYZ Fabricación Avanzada S.A.",
+                        "tipo": "Operativa"
+                    },
+                    "porcentajeParticipacion": 50,
+                    "porcentajeParticipacionUtilidades": 60
+                },
+                {
+                    "empresa": {
+                        "rut": "78901234-5",
+                        "nombre": "XYZ Innovaciones S.A.",
+                        "tipo": "Operativa"
+                    },
+                    "porcentajeParticipacion": 50,
+                    "porcentajeParticipacionUtilidades": 60
+                }
+            ]
+        },
+        {
+            "rut": "34567890-1",
+            "nombre": "XYZ Distribución S.A.",
+            "tipo": "Operativa",
+            "capitalEnterado": 5000000,
+            "lineaNegocio": "Distribución de productos",
+            "participaciones": [
+                {
+                    "empresa": {
+                        "rut": "45678901-2",
+                        "nombre": "XYZ Innovación S.A.",
+                        "tipo": "Operativa"
+                    },
+                    "porcentajeParticipacion": 60,
+                    "porcentajeParticipacionUtilidades": 70
+                }
+            ]
+        },
+        {
+            "rut": "45678901-2",
+            "nombre": "XYZ Innovación S.A.",
+            "tipo": "Operativa",
+            "capitalEnterado": 5000000,
+            "lineaNegocio": "Desarrollo de tecnología",
+            "participaciones": [
+                {
+                    "empresa": {
+                        "rut": "23456789-0",
+                        "nombre": "XYZ Producción S.A.",
+                        "tipo": "Operativa"
+                    },
+                    "porcentajeParticipacion": 60,
+                    "porcentajeParticipacionUtilidades": 70
+                }
+            ]
+        },
+        {
+            "rut": "56789012-3",
+            "nombre": "XYZ Nuevos Productos S.A.",
+            "tipo": "Operativa",
+            "capitalEnterado": 6000000,
+            "lineaNegocio": "Fabricación de productos avanzados",
+            "participaciones": [
+                 {
+                    "empresa": {
+                        "rut": "89012345-6",
+                        "nombre": "XYZ Producto 1 S.A.",
+                        "tipo": "Operativa",
+                    },
+                    "porcentajeParticipacion": 50,
+                    "porcentajeParticipacionUtilidades": 60
+                },
+                    {
+                    "empresa": {
+                        "rut": "90123456-7",
+                        "nombre": "XYZ Producto 2 S.A.",
+                        "tipo": "Operativa",
+                    },
+                    "porcentajeParticipacion": 50,
+                    "porcentajeParticipacionUtilidades": 60
+                },
+                   {
+                    "empresa": {
+                        "rut": "11223344-8",
+                        "nombre": "XYZ Producto 3 S.A.",
+                        "tipo": "Operativa"
+                    },
+                    "porcentajeParticipacion": 50,
+                    "porcentajeParticipacionUtilidades": 60
+                },
 
+                     {
+                    "empresa": {
+                        "rut": "22334455-9",
+                        "nombre": "XYZ Producto 4 S.A.",
+                        "tipo": "Operativa",
+                    },
+                    "porcentajeParticipacion": 50,
+                    "porcentajeParticipacionUtilidades": 60
+                },
+                {
+                    "empresa": {
+                        "rut": "33445566-0",
+                         "nombre": "XYZ Producto 5 S.A.",
+                         "tipo": "Operativa",
+                    },
+                    "porcentajeParticipacion": 50,
+                    "porcentajeParticipacionUtilidades": 60
+                },
+
+
+
+            ]
+        },
+        {
+            "rut": "67890123-4",
+            "nombre": "XYZ Fabricación Avanzada S.A.",
+            "tipo": "Operativa",
+            "capitalEnterado": 7000000,
+            "lineaNegocio": "Producción avanzada",
+            "participaciones": []
+        },
+        {
+            "rut": "78901234-5",
+            "nombre": "XYZ Innovaciones S.A.",
+            "tipo": "Operativa",
+            "capitalEnterado": 8000000,
+            "lineaNegocio": "Innovaciones tecnológicas",
+            "participaciones": []
+        },
+        {
+            "rut": "89012345-6",
+            "nombre": "XYZ Producto 1 S.A.",
+            "tipo": "Operativa",
+            "capitalEnterado": 2000000,
+            "lineaNegocio": "Innovación en productos",
+            "participaciones": [
+
+            ]
+        },
+        {
+            "rut": "90123456-7",
+            "nombre": "XYZ Producto 2 S.A.",
+            "tipo": "Operativa",
+            "capitalEnterado": 2500000,
+            "lineaNegocio": "Innovación en productos",
+            "participaciones": [
+
+            ]
+        },
+        {
+            "rut": "11223344-8",
+            "nombre": "XYZ Producto 3 S.A.",
+            "tipo": "Operativa",
+            "capitalEnterado": 3000000,
+            "lineaNegocio": "Investigación de productos",
+            "participaciones": [
+
+            ]
+        },
+        {
+            "rut": "22334455-9",
+            "nombre": "XYZ Producto 4 S.A.",
+            "tipo": "Operativa",
+            "capitalEnterado": 3500000,
+            "lineaNegocio": "Desarrollo de productos",
+            "participaciones": [
+
+            ]
+        },
+        {
+            "rut": "33445566-0",
+            "nombre": "XYZ Producto 5 S.A.",
+            "tipo": "Operativa",
+            "capitalEnterado": 4000000,
+            "lineaNegocio": "Productos avanzados",
+            "participaciones": [
+
+            ]
+        }
+    ]
 };
+
+
 
 // Función para cargar los nodos y aristas desde el JSON
 // Función para cargar los nodos y aristas desde el nuevo formato JSON
