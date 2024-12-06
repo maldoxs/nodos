@@ -147,6 +147,8 @@
                     ref="tooltip"
                     class="tooltip"
                     :style="{ ...tooltipPos, opacity: tooltipOpacity }">
+                    <!-- Botón de cerrar -->
+                    <button class="close-btn" @click="closeTooltip('node')">×</button>
                     <div><strong>Nombre:</strong> {{ tooltipData.name }}</div>
                     <div v-if="tooltipData.data">
                         <div><strong>RUT:</strong> {{ tooltipData.data.rut }}</div>
@@ -167,6 +169,8 @@
                     ref="edgeTooltip"
                     class="tooltip"
                     :style="{ ...edgeTooltipPos, opacity: edgeTooltipOpacity }">
+                    <!-- Botón de cerrar -->
+                    <button class="close-btn" @click="closeTooltip('edge')">×</button>
                     <div>
                         <strong>{{ edgeTooltipData.name }}</strong>
                     </div>
@@ -313,7 +317,7 @@
     const edgeTooltipPos = ref({ left: "0px", top: "0px" });
     const targetEdgeId = ref<string>("");
 
-    //Actualizar posición del tooltip para nodos**/;
+    // Actualizar la función de posición del tooltip para nodos
     const updateTooltipPosition = () => {
         if (!graph.value || !tooltip.value || !targetNodeId.value) return;
 
@@ -360,8 +364,7 @@
             }
         }
     );
-
-    // **Actualizar posición del tooltip para aristas**
+    // Verificación en el evento "edge:click" para evitar que "edgeTooltip.value" sea undefined
     const updateEdgeTooltipPosition = () => {
         if (!graph.value || !edgeTooltip.value || !targetEdgeId.value) return;
 
@@ -390,31 +393,55 @@
         };
     };
 
-    // Event Handlers
+    // Función para cerrar los tooltips
+    const closeTooltip = (type: string) => {
+        console.log(`Cerrando tooltip de tipo: ${type}`);
+        if (type === "node") {
+            tooltipOpacity.value = 0; // Ocultar el tooltip de nodo
+            targetNodeId.value = ""; // Limpiar el ID del nodo
+        } else if (type === "edge") {
+            edgeTooltipOpacity.value = 0; // Ocultar el tooltip de arista
+            targetEdgeId.value = ""; // Limpiar el ID de la arista
+        }
+    };
+
+    // Event Handlers para el clic en los nodos y aristas
+    // Event Handlers para el clic en los nodos y aristas
     const eventHandlers: vNG.EventHandlers = {
-        "node:pointerover": ({ node }) => {
+        "node:click": ({ node }) => {
+            closeTooltip("node"); // Cerrar cualquier tooltip de nodo antes de abrir el nuevo
+
             const nodeData = nodes[node];
             const nodeLayout = layouts.nodes[node];
 
             if (nodeData && nodeLayout) {
+                if (!graph.value || !tooltip.value) return;
+
+                const domPoint = graph.value.translateFromSvgToDomCoordinates(nodeLayout);
+
                 tooltipData.value = {
                     id: node,
                     name: nodeData.name || `Nodo sin nombre (${node})`,
                     x: nodeLayout.x.toFixed(2),
                     y: nodeLayout.y.toFixed(2),
-                    data: nodeData.data, // Asegúrate de incluir 'data'
+                    data: nodeData.data,
                 };
-                tooltipOpacity.value = 1;
+
+                tooltipPos.value = {
+                    left: `${domPoint.x - tooltip.value.offsetWidth / 2}px`,
+                    top: `${domPoint.y - tooltip.value.offsetHeight - 20}px`,
+                };
+
+                tooltipOpacity.value = 1; // Mostrar el tooltip de nodo
                 targetNodeId.value = node;
-                updateTooltipPosition();
             }
         },
-        "node:pointerout": () => {
-            tooltipOpacity.value = 0; // Ocultar tooltip
-        },
-        "edge:pointerover": (event: vNG.EdgeEvent<PointerEvent>) => {
+
+        "edge:click": (event: vNG.EdgeEvent<MouseEvent>) => {
+            closeTooltip("edge"); // Cerrar cualquier tooltip de arista antes de abrir el nuevo
+
             const edge = event.edge;
-            if (!edge) return; // Si 'edge' es undefined, salimos del manejador
+            if (!edge) return;
 
             const edgeData = edges[edge];
             if (edgeData) {
@@ -422,7 +449,20 @@
                 const targetNode = nodes[edgeData.target];
 
                 if (sourceNode && targetNode) {
-                    // Actualizar los datos del tooltip de la arista
+                    if (!graph.value || !edgeTooltip.value) return;
+
+                    const sourcePos = layouts.nodes[edgeData.source];
+                    const targetPos = layouts.nodes[edgeData.target];
+
+                    if (!sourcePos || !targetPos) return;
+
+                    const edgeCenter = {
+                        x: (sourcePos.x + targetPos.x) / 2,
+                        y: (sourcePos.y + targetPos.y) / 2,
+                    };
+
+                    const domPoint = graph.value.translateFromSvgToDomCoordinates(edgeCenter);
+
                     edgeTooltipData.value = {
                         id: edge,
                         name: `Conexión entre ${sourceNode.name} y ${targetNode.name}`,
@@ -430,15 +470,16 @@
                         porcentajeParticipacionUtilidades:
                             edgeData.porcentajeParticipacionUtilidades,
                     };
+
+                    edgeTooltipPos.value = {
+                        left: `${domPoint.x - edgeTooltip.value.offsetWidth / 2}px`,
+                        top: `${domPoint.y - edgeTooltip.value.offsetHeight - 20}px`,
+                    };
+
+                    edgeTooltipOpacity.value = 1; // Mostrar el tooltip de arista
                     targetEdgeId.value = edge;
-                    edgeTooltipOpacity.value = 1; // Mostrar tooltip
-                    updateEdgeTooltipPosition();
                 }
             }
-        },
-
-        "edge:pointerout": () => {
-            edgeTooltipOpacity.value = 0; // Ocultar tooltip
         },
     };
 
@@ -659,5 +700,29 @@
         pointer-events: none;
         transition: opacity 0.2s ease-in-out;
         z-index: 1000;
+        opacity: 0; /* Asegúrate de que el tooltip esté oculto por defecto */
+    }
+
+    .tooltip .close-btn {
+        pointer-events: auto; /* Habilitar eventos en el botón de cerrar */
+    }
+
+    .tooltip[style*="opacity: 1"] {
+        opacity: 1; /* Cuando la opacidad es 1, el tooltip debe ser visible */
+    }
+
+    .close-btn {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        border: none;
+        background: transparent;
+        color: #333;
+        font-size: 18px;
+        cursor: pointer;
+    }
+
+    .close-btn:hover {
+        color: #e63946; /* Cambiar el color al pasar el ratón */
     }
 </style>
