@@ -1167,15 +1167,15 @@ const configs = reactive(
   })
 );
 
-onMounted(() => {
-  loadNodesFromJson();
-  // Cargar layouts guardados
-  const savedLayouts = localStorage.getItem('layouts');
-  if (savedLayouts) {
-    const parsedLayouts = JSON.parse(savedLayouts);
-    Object.assign(layouts.nodes, parsedLayouts.nodes);
-  }
-});
+// onMounted(() => {
+//   loadNodesFromJson();
+//   // Cargar layouts guardados
+//   const savedLayouts = localStorage.getItem('layouts');
+//   if (savedLayouts) {
+//     const parsedLayouts = JSON.parse(savedLayouts);
+//     Object.assign(layouts.nodes, parsedLayouts.nodes);
+//   }
+// });
 
 export default {
   nodes,
@@ -1183,4 +1183,5 @@ export default {
   layouts,
   configs,
   updateNodePosition,
+  loadNodesFromJson
 };

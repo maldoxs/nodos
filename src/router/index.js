@@ -1,21 +1,22 @@
 import { createRouter, createWebHistory } from "vue-router";
 
-console.log(import.meta.env.VITE_APP_CTX); // Verifica que la variable de entorno se carga correctamente
+//console.log(import.meta.env.VITE_APP_CTX); // Debería mostrar el valor definido en .env, e.g. "/taf-resoluciones-intra/"
 
 const routes = [
     {
         path: "/",
         name: "home",
-        component: () => import("../views/ArmaNodoGraf.vue"), // Carga diferida del componente HomeView
+        component: () => import("../views/ArmaNodoGraf.vue"),
     },
     {
         path: "/about",
         name: "about",
-        component: () => import("../views/AboutView.vue"), // Carga diferida del componente AboutView
+        component: () => import("../views/AboutView.vue"),
     },
 ];
 
-const baseURL = "/graficos-intra/"; // Usa la URL de base manualmente
+// Usa la variable de entorno VITE_APP_CTX
+const baseURL = import.meta.env.VITE_APP_CTX || "/";
 
 const router = createRouter({
     history: createWebHistory(baseURL),

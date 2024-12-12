@@ -1,3 +1,322 @@
+<script setup lang="ts">
+    import { reactive, ref, onMounted, computed, watchEffect, watch } from "vue";
+    import * as vNG from "v-network-graph";
+    import { ForceLayout } from "v-network-graph/lib/force-layout";
+    import { Download } from "@element-plus/icons";
+    import data from "../data";
+
+    const nodes = reactive({ ...data.nodes });
+    const edges = reactive({ ...data.edges });
+    const layouts = reactive(data.layouts);
+
+    const nextNodeIndex = ref(Object.keys(nodes).length + 1);
+    const nextEdgeIndex = ref(Object.keys(edges).length + 1);
+    const selectedNodes = ref<string[]>([]);
+    const selectedEdges = ref<string[]>([]);
+    const newNodeName = ref<string>("");
+    const graph = ref<vNG.Instance | null>(null);
+    const graphContainer = ref<HTMLDivElement | null>(null);
+
+    const d3ForceEnabled = computed({
+        get: () => configs.view?.layoutHandler instanceof ForceLayout,
+        set: (value: boolean) => {
+            if (configs.view) {
+                configs.view.layoutHandler = value ? new ForceLayout() : new vNG.SimpleLayout();
+            }
+        },
+    });
+
+    const onNodeMoved = ({ nodeId, x, y }) => {
+        data.updateNodePosition(nodeId, { x, y });
+    };
+
+    const configs = reactive(
+        vNG.defineConfigs({
+            view: {
+                layoutHandler: new ForceLayout(),
+                panEnabled: true,
+                zoomEnabled: true,
+            },
+            node: {
+                normal: {
+                    type: "circle",
+                    radius: (node) => node.size,
+                    color: (node) => node.color,
+                },
+                hover: {
+                    radius: (node) => node.size + 2,
+                    color: (node) => node.color,
+                },
+                selectable: true,
+                label: {
+                    visible: (node) => !!node.label,
+                    directionAutoAdjustment: true,
+                    fontSize: 15,
+                    color: "black",
+                    fontFamily: "Arial",
+                    direction: "south",
+                },
+                focusring: {
+                    color: "darkgray",
+                },
+            },
+            edge: {
+                normal: {
+                    width: 2,
+                    color: (edge) => edge.color,
+                    dasharray: (edge) => (edge.dashed ? "4" : "0"),
+                },
+                selectable: true,
+                marker: {
+                    target: { type: "arrow" },
+                },
+                label: {
+                    fontSize: 40,
+                },
+            },
+        })
+    );
+
+    const tooltip = ref<HTMLDivElement>();
+    const tooltipData = ref<Record<string, any>>({});
+    const tooltipOpacity = ref(0);
+    const tooltipPos = ref({ left: "0px", top: "0px" });
+    const targetNodeId = ref<string>("");
+
+    const edgeTooltip = ref<HTMLDivElement>();
+    const edgeTooltipData = ref<Record<string, any>>({});
+    const edgeTooltipOpacity = ref(0);
+    const edgeTooltipPos = ref({ left: "0px", top: "0px" });
+    const targetEdgeId = ref<string>("");
+
+    watchEffect(() => {
+        localStorage.setItem("layouts", JSON.stringify(layouts));
+    });
+
+    onMounted(() => {
+        const savedLayouts = localStorage.getItem("layouts");
+        if (savedLayouts) {
+            const parsedLayouts = JSON.parse(savedLayouts);
+            Object.assign(layouts.nodes, parsedLayouts.nodes);
+        }
+    });
+
+    onMounted(() => {
+        // Primero, cargar los nodos desde el JSON
+        data.loadNodesFromJson();
+
+        // Luego, cargar layouts guardados si existen
+        const savedLayouts = localStorage.getItem("layouts");
+        if (savedLayouts) {
+            const parsedLayouts = JSON.parse(savedLayouts);
+            Object.assign(layouts.nodes, parsedLayouts.nodes);
+        }
+    });
+
+    watch(
+        () => [targetNodeId.value, tooltipOpacity.value],
+        () => {
+            if (!graph.value || !tooltip.value || !targetNodeId.value) return;
+            const nodeLayout = layouts.nodes[targetNodeId.value];
+            if (nodeLayout) {
+                const domPoint = graph.value.translateFromSvgToDomCoordinates(nodeLayout);
+                tooltipPos.value = {
+                    left: `${domPoint.x - tooltip.value.offsetWidth / 2}px`,
+                    top: `${domPoint.y - tooltip.value.offsetHeight - 20}px`,
+                };
+            }
+        }
+    );
+
+    const eventHandlers: vNG.EventHandlers = {
+        "node:click": ({ node }) => {
+            closeTooltip("node");
+            const nodeData = nodes[node];
+            const nodeLayout = layouts.nodes[node];
+            if (nodeData && nodeLayout && graph.value && tooltip.value) {
+                const domPoint = graph.value.translateFromSvgToDomCoordinates(nodeLayout);
+                tooltipData.value = {
+                    id: node,
+                    name: nodeData.name || `Nodo sin nombre (${node})`,
+                    x: nodeLayout.x.toFixed(2),
+                    y: nodeLayout.y.toFixed(2),
+                    data: nodeData.data,
+                };
+                tooltipPos.value = {
+                    left: `${domPoint.x - tooltip.value.offsetWidth / 2}px`,
+                    top: `${domPoint.y - tooltip.value.offsetHeight - 20}px`,
+                };
+                tooltipOpacity.value = 1;
+                targetNodeId.value = node;
+            }
+        },
+        "edge:click": (event: vNG.EdgeEvent<MouseEvent>) => {
+            closeTooltip("edge");
+            const edge = event.edge;
+            if (!edge) return;
+            const edgeData = edges[edge];
+            if (edgeData && graph.value && edgeTooltip.value) {
+                const sourcePos = layouts.nodes[edgeData.source];
+                const targetPos = layouts.nodes[edgeData.target];
+                if (!sourcePos || !targetPos) return;
+                const edgeCenter = {
+                    x: (sourcePos.x + targetPos.x) / 2,
+                    y: (sourcePos.y + targetPos.y) / 2,
+                };
+                const domPoint = graph.value.translateFromSvgToDomCoordinates(edgeCenter);
+                edgeTooltipData.value = {
+                    id: edge,
+                    name: `Conexión entre ${nodes[edgeData.source].name} y ${
+                        nodes[edgeData.target].name
+                    }`,
+                    porcentajeParticipacion: edgeData.porcentajeParticipacion,
+                    porcentajeParticipacionUtilidades: edgeData.porcentajeParticipacionUtilidades,
+                };
+                edgeTooltipPos.value = {
+                    left: `${domPoint.x - edgeTooltip.value.offsetWidth / 2}px`,
+                    top: `${domPoint.y - edgeTooltip.value.offsetHeight - 20}px`,
+                };
+                edgeTooltipOpacity.value = 1;
+                targetEdgeId.value = edge;
+            }
+        },
+    };
+
+    const closeTooltip = (type: string) => {
+        if (type === "node") {
+            tooltipOpacity.value = 0;
+            targetNodeId.value = "";
+        } else if (type === "edge") {
+            edgeTooltipOpacity.value = 0;
+            targetEdgeId.value = "";
+        }
+    };
+
+    async function downloadAsSvg() {
+        if (!graph.value) return;
+        try {
+            const svgText = await graph.value.exportAsSvgText();
+            const blob = new Blob([svgText], { type: "image/svg+xml" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "network-graph.svg";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Error al exportar como SVG:", error);
+        }
+    }
+
+    const addNode = () => {
+        const nodeId = `node${nextNodeIndex.value}`;
+        const name = `Nodo ${nextNodeIndex.value}`;
+        const x = Math.random() * 400;
+        const y = Math.random() * 400;
+        nodes[nodeId] = { name, x, y, size: 15, color: "#0064a0", label: true };
+        layouts.nodes[nodeId] = { x, y };
+        nextNodeIndex.value++;
+    };
+
+    const removeNode = () => {
+        for (const nodeId of selectedNodes.value) {
+            delete nodes[nodeId];
+        }
+        selectedNodes.value = [];
+    };
+
+    const addEdge = () => {
+        if (selectedNodes.value.length !== 2) {
+            alert("Por favor selecciona exactamente dos nodos para crear una arista.");
+            return;
+        }
+        const [source, target] = selectedNodes.value;
+        const edgeId = `edge${nextEdgeIndex.value}`;
+        const edgeColor = "#002C48";
+
+        const porcentajeParticipacion = parseFloat(
+            prompt("Ingrese el porcentaje de participación:", "0") || "0"
+        );
+        const porcentajeParticipacionUtilidades = parseFloat(
+            prompt("Ingrese el porcentaje de participación en utilidades:", "0") || "0"
+        );
+
+        edges[edgeId] = {
+            source,
+            target,
+            color: edgeColor,
+            porcentajeParticipacion,
+            porcentajeParticipacionUtilidades,
+        };
+        nextEdgeIndex.value++;
+    };
+
+    const removeEdge = () => {
+        for (const edgeId of selectedEdges.value) {
+            delete edges[edgeId];
+        }
+        selectedEdges.value = [];
+    };
+
+    const updateNodeName = () => {
+        if (selectedNodes.value.length === 1) {
+            const nodeId = selectedNodes.value[0];
+            nodes[nodeId].name = newNodeName.value;
+            newNodeName.value = "";
+        } else {
+            alert("Por favor selecciona un único nodo para renombrarlo.");
+        }
+    };
+
+    const saveNodes = () => {
+        const currentGraphState = {
+            nodes: { ...nodes },
+            edges: { ...edges },
+            nextNodeIndex: nextNodeIndex.value,
+            nextEdgeIndex: nextEdgeIndex.value,
+        };
+        localStorage.setItem("savedGraphState", JSON.stringify(currentGraphState));
+        alert("Nodos y aristas guardados correctamente.");
+    };
+
+    const loadNodes = () => {
+        const savedGraphState = localStorage.getItem("savedGraphState");
+        if (savedGraphState) {
+            const {
+                nodes: savedNodes,
+                edges: savedEdges,
+                nextNodeIndex: savedNodeIndex,
+                nextEdgeIndex: savedEdgeIndex,
+            } = JSON.parse(savedGraphState);
+            for (const nodeId in savedNodes) {
+                nodes[nodeId] = { ...nodes[nodeId], ...savedNodes[nodeId] };
+            }
+            for (const edgeId in savedEdges) {
+                edges[edgeId] = { ...edges[edgeId], ...savedEdges[edgeId] };
+            }
+            nextNodeIndex.value = savedNodeIndex;
+            nextEdgeIndex.value = savedEdgeIndex;
+        }
+    };
+
+    onMounted(() => {
+        loadNodes();
+    });
+
+    // Función para activar/desactivar fullscreen usando el ícono
+    function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            graphContainer.value?.requestFullscreen();
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
+    }
+</script>
+
 <template>
     <div class="container">
         <div class="card p-3 mb-3 shadow-sm">
@@ -44,6 +363,7 @@
                             </div>
                         </div>
                     </div>
+
                     <!-- Checkbox para habilitar Force Layout -->
                     <div class="col-md-6 mt-3">
                         <div class="p-3 bg-light rounded shadow-sm">
@@ -104,7 +424,26 @@
         </div>
 
         <div class="tooltip-wrapper">
-            <div class="network-graph-container bg-light rounded shadow-sm p-3">
+            <div
+                class="network-graph-container bg-light rounded shadow-sm p-3"
+                ref="graphContainer">
+                <!-- NUEVO: Contenedor para el ícono de fullscreen con texto -->
+                <div class="fullscreen-wrapper" aria-label="Agrandar imagen" role="button">
+                    <span class="fullscreen-text">Ver más grande</span>
+                    <svg
+                        @click="toggleFullscreen"
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="24"
+                        height="24"
+                        fill="currentColor"
+                        class="fullscreen-icon"
+                        viewBox="0 0 16 16">
+                        <path
+                            fill-rule="evenodd"
+                            d="M5.828 10.172a.5.5 0 0 0-.707 0l-4.096 4.096V11.5a.5.5 0 0 0-1 0v3.975a.5.5 0 0 0 .5.5H4.5a.5.5 0 0 0 0-1H1.732l4.096-4.096a.5.5 0 0 0 0-.707m4.344 0a.5.5 0 0 1 .707 0l4.096 4.096V11.5a.5.5 0 1 1 1 0v3.975a.5.5 0 0 1-.5.5H11.5a.5.5 0 0 1 0-1h2.768l-4.096-4.096a.5.5 0 0 1 0-.707m0-4.344a.5.5 0 0 0 .707 0l4.096-4.096V4.5a.5.5 0 1 0 1 0V.525a.5.5 0 0 0-.5-.5H11.5a.5.5 0 0 0 0 1h2.768l-4.096 4.096a.5.5 0 0 0 0 .707m-4.344 0a.5.5 0 0 1-.707 0L1.025 1.732V4.5a.5.5 0 0 1-1 0V.525a.5.5 0 0 1 .5-.5H4.5a.5.5 0 0 1 0 1H1.732l4.096 4.096a.5.5 0 0 1 0 .707" />
+                    </svg>
+                </div>
+
                 <v-network-graph
                     v-model:selected-nodes="selectedNodes"
                     v-model:selected-edges="selectedEdges"
@@ -147,7 +486,6 @@
                     ref="tooltip"
                     class="tooltip"
                     :style="{ ...tooltipPos, opacity: tooltipOpacity }">
-                    <!-- Botón de cerrar -->
                     <button class="close-btn" @click="closeTooltip('node')">×</button>
                     <div><strong>Nombre:</strong> {{ tooltipData.name }}</div>
                     <div v-if="tooltipData.data">
@@ -169,7 +507,6 @@
                     ref="edgeTooltip"
                     class="tooltip"
                     :style="{ ...edgeTooltipPos, opacity: edgeTooltipOpacity }">
-                    <!-- Botón de cerrar -->
                     <button class="close-btn" @click="closeTooltip('edge')">×</button>
                     <div>
                         <strong>{{ edgeTooltipData.name }}</strong>
@@ -223,401 +560,10 @@
     </div>
 </template>
 
-<script setup lang="ts">
-    import { reactive, ref, onMounted, computed, watchEffect, watch } from "vue";
-    import * as vNG from "v-network-graph";
-    import { ForceLayout } from "v-network-graph/lib/force-layout"; // Importar ForceLayout para el diseño forzado
-    import { Download } from "@element-plus/icons"; // Importar el ícono 'Download' de Element Plus
-    import data from "../data"; // Datos para los nodos y aristas contiene la configuración y los nodos iniciales.
-
-    const nodes = reactive({ ...data.nodes });
-    const edges = reactive({ ...data.edges });
-    const layouts = reactive(data.layouts);
-
-    const nextNodeIndex = ref(Object.keys(nodes).length + 1);
-    const nextEdgeIndex = ref(Object.keys(edges).length + 1);
-    const selectedNodes = ref<string[]>([]);
-    const selectedEdges = ref<string[]>([]);
-    const newNodeName = ref<string>("");
-    const graph = ref<vNG.Instance | null>(null);
-
-    // Propiedad computada para habilitar o deshabilitar Force Layout
-    const d3ForceEnabled = computed({
-        get: () => configs.view?.layoutHandler instanceof ForceLayout,
-        set: (value: boolean) => {
-            if (configs.view) {
-                if (value) {
-                    configs.view.layoutHandler = new ForceLayout();
-                } else {
-                    configs.view.layoutHandler = new vNG.SimpleLayout();
-                }
-            }
-        },
-    });
-
-    // Configuración del grafo, incluyendo el handler del layout
-    const configs = reactive(
-        vNG.defineConfigs({
-            view: {
-                layoutHandler: new ForceLayout(), // Se inicializa con ForceLayout por defecto
-                panEnabled: true,
-                zoomEnabled: true,
-            },
-            node: {
-                normal: {
-                    type: "circle",
-                    radius: (node) => node.size,
-                    color: (node) => node.color,
-                },
-                hover: {
-                    radius: (node) => node.size + 2,
-                    color: (node) => node.color,
-                },
-                selectable: true,
-                label: {
-                    visible: (node) => !!node.label,
-                    directionAutoAdjustment: true,
-                    fontSize: 15,
-                    color: "black",
-                    fontFamily: "Arial",
-                    direction: "south",
-                },
-                focusring: {
-                    color: "darkgray",
-                },
-            },
-            edge: {
-                normal: {
-                    width: 2,
-                    color: (edge) => edge.color,
-                    dasharray: (edge) => (edge.dashed ? "4" : "0"),
-                },
-                selectable: true,
-                marker: {
-                    target: { type: "arrow" },
-                },
-                label: {
-                    fontSize: 40,
-                },
-            },
-        })
-    );
-
-    // Tooltip dinámico para nodos
-    const tooltip = ref<HTMLDivElement>();
-    const tooltipData = ref<Record<string, any>>({});
-    const tooltipOpacity = ref(0);
-    const tooltipPos = ref({ left: "0px", top: "0px" });
-    const targetNodeId = ref<string>("");
-
-    // Tooltip dinámico para aristas
-    const edgeTooltip = ref<HTMLDivElement>();
-    const edgeTooltipData = ref<Record<string, any>>({});
-    const edgeTooltipOpacity = ref(0);
-    const edgeTooltipPos = ref({ left: "0px", top: "0px" });
-    const targetEdgeId = ref<string>("");
-
-    // Actualizar la función de posición del tooltip para nodos
-    const updateTooltipPosition = () => {
-        if (!graph.value || !tooltip.value || !targetNodeId.value) return;
-
-        const nodeLayout = layouts.nodes[targetNodeId.value];
-        if (!nodeLayout) return;
-
-        // Mapeo de coordenadas SVG a DOM
-        const domPoint = graph.value.translateFromSvgToDomCoordinates(nodeLayout);
-
-        // Ajustar posición del tooltip
-        tooltipPos.value = {
-            left: `${domPoint.x - tooltip.value.offsetWidth / 2}px`,
-            top: `${domPoint.y - tooltip.value.offsetHeight - 20}px`,
-        };
-    };
-
-    watchEffect(() => {
-        localStorage.setItem("layouts", JSON.stringify(layouts));
-    });
-
-    onMounted(() => {
-        const savedLayouts = localStorage.getItem("layouts");
-        if (savedLayouts) {
-            const parsedLayouts = JSON.parse(savedLayouts);
-            Object.assign(layouts.nodes, parsedLayouts.nodes);
-        }
-    });
-
-    // Reemplazar el cálculo de la posición del nodo en el tooltip
-    // Actualiza la lógica del watch para reutilizar targetNodePos
-    watch(
-        () => [targetNodeId.value, tooltipOpacity.value],
-        () => {
-            if (!graph.value || !tooltip.value || !targetNodeId.value) return;
-
-            const nodeLayout = layouts.nodes[targetNodeId.value];
-            if (nodeLayout) {
-                const domPoint = graph.value.translateFromSvgToDomCoordinates(nodeLayout);
-
-                tooltipPos.value = {
-                    left: `${domPoint.x - tooltip.value.offsetWidth / 2}px`,
-                    top: `${domPoint.y - tooltip.value.offsetHeight - 20}px`,
-                };
-            }
-        }
-    );
-    // Verificación en el evento "edge:click" para evitar que "edgeTooltip.value" sea undefined
-    const updateEdgeTooltipPosition = () => {
-        if (!graph.value || !edgeTooltip.value || !targetEdgeId.value) return;
-
-        const edgeData = edges[targetEdgeId.value];
-        if (!edgeData) return;
-
-        const sourcePos = layouts.nodes[edgeData.source];
-        const targetPos = layouts.nodes[edgeData.target];
-
-        // Aseguramos que sourcePos y targetPos existen
-        if (!sourcePos || !targetPos) return;
-
-        // Calcular la posición central de la arista
-        const edgeCenter = {
-            x: (sourcePos.x + targetPos.x) / 2,
-            y: (sourcePos.y + targetPos.y) / 2,
-        };
-
-        // Mapeo de coordenadas SVG a DOM
-        const domPoint = graph.value.translateFromSvgToDomCoordinates(edgeCenter);
-
-        // Ajustar posición del tooltip
-        edgeTooltipPos.value = {
-            left: `${domPoint.x - edgeTooltip.value.offsetWidth / 2}px`,
-            top: `${domPoint.y - edgeTooltip.value.offsetHeight - 20}px`,
-        };
-    };
-
-    // Función para cerrar los tooltips
-    const closeTooltip = (type: string) => {
-        console.log(`Cerrando tooltip de tipo: ${type}`);
-        if (type === "node") {
-            tooltipOpacity.value = 0; // Ocultar el tooltip de nodo
-            targetNodeId.value = ""; // Limpiar el ID del nodo
-        } else if (type === "edge") {
-            edgeTooltipOpacity.value = 0; // Ocultar el tooltip de arista
-            targetEdgeId.value = ""; // Limpiar el ID de la arista
-        }
-    };
-
-    // Event Handlers para el clic en los nodos y aristas
-    // Event Handlers para el clic en los nodos y aristas
-    const eventHandlers: vNG.EventHandlers = {
-        "node:click": ({ node }) => {
-            closeTooltip("node"); // Cerrar cualquier tooltip de nodo antes de abrir el nuevo
-
-            const nodeData = nodes[node];
-            const nodeLayout = layouts.nodes[node];
-
-            if (nodeData && nodeLayout) {
-                if (!graph.value || !tooltip.value) return;
-
-                const domPoint = graph.value.translateFromSvgToDomCoordinates(nodeLayout);
-
-                tooltipData.value = {
-                    id: node,
-                    name: nodeData.name || `Nodo sin nombre (${node})`,
-                    x: nodeLayout.x.toFixed(2),
-                    y: nodeLayout.y.toFixed(2),
-                    data: nodeData.data,
-                };
-
-                tooltipPos.value = {
-                    left: `${domPoint.x - tooltip.value.offsetWidth / 2}px`,
-                    top: `${domPoint.y - tooltip.value.offsetHeight - 20}px`,
-                };
-
-                tooltipOpacity.value = 1; // Mostrar el tooltip de nodo
-                targetNodeId.value = node;
-            }
-        },
-
-        "edge:click": (event: vNG.EdgeEvent<MouseEvent>) => {
-            closeTooltip("edge"); // Cerrar cualquier tooltip de arista antes de abrir el nuevo
-
-            const edge = event.edge;
-            if (!edge) return;
-
-            const edgeData = edges[edge];
-            if (edgeData) {
-                const sourceNode = nodes[edgeData.source];
-                const targetNode = nodes[edgeData.target];
-
-                if (sourceNode && targetNode) {
-                    if (!graph.value || !edgeTooltip.value) return;
-
-                    const sourcePos = layouts.nodes[edgeData.source];
-                    const targetPos = layouts.nodes[edgeData.target];
-
-                    if (!sourcePos || !targetPos) return;
-
-                    const edgeCenter = {
-                        x: (sourcePos.x + targetPos.x) / 2,
-                        y: (sourcePos.y + targetPos.y) / 2,
-                    };
-
-                    const domPoint = graph.value.translateFromSvgToDomCoordinates(edgeCenter);
-
-                    edgeTooltipData.value = {
-                        id: edge,
-                        name: `Conexión entre ${sourceNode.name} y ${targetNode.name}`,
-                        porcentajeParticipacion: edgeData.porcentajeParticipacion,
-                        porcentajeParticipacionUtilidades:
-                            edgeData.porcentajeParticipacionUtilidades,
-                    };
-
-                    edgeTooltipPos.value = {
-                        left: `${domPoint.x - edgeTooltip.value.offsetWidth / 2}px`,
-                        top: `${domPoint.y - edgeTooltip.value.offsetHeight - 20}px`,
-                    };
-
-                    edgeTooltipOpacity.value = 1; // Mostrar el tooltip de arista
-                    targetEdgeId.value = edge;
-                }
-            }
-        },
-    };
-
-    const onNodeMoved = (nodeId, newPosition) => {
-        layouts.nodes[nodeId] = { ...newPosition };
-        nodes[nodeId].x = newPosition.x;
-        nodes[nodeId].y = newPosition.y;
-    };
-
-    async function downloadAsSvg() {
-        if (!graph.value) return;
-        try {
-            const svgText = await graph.value.exportAsSvgText();
-            const blob = new Blob([svgText], { type: "image/svg+xml" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "network-graph.svg";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error("Error al exportar como SVG:", error);
-        }
-    }
-
-    // Funciones para agregar y eliminar nodos y aristas...
-    // **Agregar un nodo**
-    const addNode = () => {
-        const nodeId = `node${nextNodeIndex.value}`;
-        const name = `Nodo ${nextNodeIndex.value}`;
-        const x = Math.random() * 400;
-        const y = Math.random() * 400;
-        nodes[nodeId] = { name, x, y, size: 15, color: "#0064a0", label: true };
-        layouts.nodes[nodeId] = { x, y };
-        nextNodeIndex.value++;
-    };
-
-    const removeNode = () => {
-        for (const nodeId of selectedNodes.value) {
-            delete nodes[nodeId];
-        }
-        selectedNodes.value = [];
-    };
-
-    const addEdge = () => {
-        if (selectedNodes.value.length !== 2) {
-            alert("Por favor selecciona exactamente dos nodos para crear una arista.");
-            return;
-        }
-        const [source, target] = selectedNodes.value;
-        const edgeId = `edge${nextEdgeIndex.value}`;
-        const edgeColor = "#002C48";
-
-        // Solicitar porcentajes al usuario
-        const porcentajeParticipacion = parseFloat(
-            prompt("Ingrese el porcentaje de participación:", "0") || "0"
-        );
-        const porcentajeParticipacionUtilidades = parseFloat(
-            prompt("Ingrese el porcentaje de participación en utilidades:", "0") || "0"
-        );
-
-        edges[edgeId] = {
-            source,
-            target,
-            color: edgeColor,
-            porcentajeParticipacion,
-            porcentajeParticipacionUtilidades,
-        };
-        nextEdgeIndex.value++;
-    };
-
-    const removeEdge = () => {
-        for (const edgeId of selectedEdges.value) {
-            delete edges[edgeId];
-        }
-        selectedEdges.value = [];
-    };
-
-    const updateNodeName = () => {
-        if (selectedNodes.value.length === 1) {
-            const nodeId = selectedNodes.value[0];
-            nodes[nodeId].name = newNodeName.value;
-            newNodeName.value = "";
-        } else {
-            alert("Por favor selecciona un único nodo para renombrarlo.");
-        }
-    };
-
-    const saveNodes = () => {
-        const currentGraphState = {
-            nodes: { ...nodes }, // Realiza una copia de los nodos
-            edges: { ...edges },
-            nextNodeIndex: nextNodeIndex.value,
-            nextEdgeIndex: nextEdgeIndex.value,
-        };
-        localStorage.setItem("savedGraphState", JSON.stringify(currentGraphState));
-        console.log("Estado guardado:", currentGraphState);
-        alert("Nodos y aristas guardados correctamente.");
-    };
-
-    const loadNodes = () => {
-        const savedGraphState = localStorage.getItem("savedGraphState");
-        if (savedGraphState) {
-            const {
-                nodes: savedNodes,
-                edges: savedEdges,
-                nextNodeIndex: savedNodeIndex,
-                nextEdgeIndex: savedEdgeIndex,
-            } = JSON.parse(savedGraphState);
-
-            // Combinar nodos
-            for (const nodeId in savedNodes) {
-                nodes[nodeId] = { ...nodes[nodeId], ...savedNodes[nodeId] };
-            }
-
-            // Combinar aristas
-            for (const edgeId in savedEdges) {
-                edges[edgeId] = { ...edges[edgeId], ...savedEdges[edgeId] };
-            }
-
-            // Restaurar los índices
-            nextNodeIndex.value = savedNodeIndex;
-            nextEdgeIndex.value = savedEdgeIndex;
-
-            console.log("Estado cargado desde el almacenamiento local:", savedGraphState);
-        } else {
-            console.log("No se encontró estado guardado.");
-        }
-    };
-
-    onMounted(() => {
-        loadNodes();
-    });
-</script>
-
 <style scoped>
+    /* Importar la fuente 'Outfit' */
+    @import url("https://fonts.googleapis.com/css2?family=Outfit:wght@700&display=swap");
+
     .network-graph-container {
         height: 700px;
         width: 100%;
@@ -625,7 +571,77 @@
         border-radius: 10px;
         background-color: #ffffff;
         padding: 20px;
+        position: relative;
     }
+
+    /* Estilos para el contenedor del ícono de fullscreen */
+    /* Estilos para el contenedor del ícono de fullscreen */
+    .fullscreen-wrapper {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        display: flex;
+        align-items: center;
+        background-color: #ec540c; /* Fondo rojo siempre visible */
+        border-radius: 4px 4px 4px;
+        padding: 4px 8px;
+        cursor: pointer;
+        transition: background-color 0.3s ease-in-out;
+        z-index: 2000;
+        flex-direction: row; /* Texto a la izquierda del ícono */
+        gap: 0; /* Eliminar cualquier espacio entre el ícono y el texto */
+    }
+
+    /* Estilo para el ícono SVG */
+    .fullscreen-icon {
+        width: 20px; /* Tamaño adecuado del ícono */
+        height: 20px;
+        color: white; /* Ícono en blanco */
+        flex-shrink: 0; /* Evita que el ícono se reduzca de tamaño */
+        transition: transform 0.3s ease-in-out;
+        border-radius: 0;
+    }
+
+    /* Estilo para el texto del tooltip */
+    .fullscreen-text {
+        position: absolute;
+        right: 100%; /* Posiciona el texto a la izquierda del ícono */
+        top: 50%; /* Centra verticalmente el texto */
+        transform: translateY(-50%); /* Centra verticalmente el texto */
+        white-space: nowrap;
+        color: white;
+        opacity: 0;
+        visibility: hidden;
+
+        font-family: "Outfit", sans-serif; /* Asegúrate de que la fuente esté cargada */
+        background-color: #ec540c; /* Fondo rojo */
+        padding: 2px 6px; /* Padding para el texto */
+        border-radius: 4px 0 0 4px; /* Bordes redondeados opcionales */
+        transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out,
+            visibility 0.3s ease-in-out;
+        transform-origin: right center; /* Definir el punto de origen para la animación */
+        margin: 0; /* Asegura que no haya márgenes que causen el espacio */
+    }
+
+    /* Mostrar el texto con animación al pasar el cursor */
+    .fullscreen-wrapper:hover .fullscreen-text.fullscreen-wrapper {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(-50%) translateX(-5px); /* Ajustar el desplazamiento para que el texto se desplace más cerca */
+        border-radius: 0 4px 4px 0;
+    }
+
+    /* Mostrar el texto con animación al pasar el cursor */
+    .fullscreen-wrapper:hover .fullscreen-text {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(-50%) translateX(0); /* Mueve el texto exactamente al borde del ícono */
+    }
+    .fullscreen-wrapper:hover {
+        border-radius: 0 4px 4px 0;
+    }
+
+    /* Estilos para otros elementos existentes */
 
     .btn-download {
         display: flex;
@@ -635,10 +651,6 @@
         font-weight: bold;
         background-color: #0056b3;
         color: #fff;
-    }
-
-    h1 {
-        color: #333;
     }
 
     .dictionary {
@@ -680,16 +692,6 @@
         vertical-align: middle;
     }
 
-    .network-graph-container {
-        position: relative;
-        height: 700px;
-        width: 100%;
-        border: 2px solid #dee2e6;
-        border-radius: 10px;
-        background-color: #ffffff;
-        padding: 20px;
-    }
-
     .tooltip {
         position: absolute;
         background-color: white;
@@ -700,15 +702,15 @@
         pointer-events: none;
         transition: opacity 0.2s ease-in-out;
         z-index: 1000;
-        opacity: 0; /* Asegúrate de que el tooltip esté oculto por defecto */
+        opacity: 0;
     }
 
     .tooltip .close-btn {
-        pointer-events: auto; /* Habilitar eventos en el botón de cerrar */
+        pointer-events: auto;
     }
 
     .tooltip[style*="opacity: 1"] {
-        opacity: 1; /* Cuando la opacidad es 1, el tooltip debe ser visible */
+        opacity: 1;
     }
 
     .close-btn {
@@ -723,6 +725,6 @@
     }
 
     .close-btn:hover {
-        color: #e63946; /* Cambiar el color al pasar el ratón */
+        color: #e63946;
     }
 </style>
