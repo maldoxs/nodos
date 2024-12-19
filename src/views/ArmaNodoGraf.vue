@@ -396,15 +396,15 @@
                             <h6 class="text-primary mb-3"><strong>Gestión de Nodos</strong></h6>
                             <div class="d-flex flex-wrap gap-2">
                                 <button
-                                    class="btn btn-primary btn-sm px-3"
-                                    @click="openAddNodeModal">
-                                    <i class="fas fa-plus-circle me-1"></i> Nodo Hijo
-                                </button>
-                                <button
                                     class="btn btn-danger btn-sm px-3"
                                     :disabled="selectedNodes.length === 0"
                                     @click="removeNode">
                                     <i class="fas fa-trash-alt me-1"></i> Eliminar Nodo
+                                </button>
+                                <button
+                                    class="btn btn-primary btn-sm px-3"
+                                    @click="openAddNodeModal">
+                                    <i class="fas fa-plus-circle me-1"></i> Crear Nodo
                                 </button>
                             </div>
                         </div>
@@ -491,21 +491,80 @@
         </div>
 
         <div class="network-graph-container bg-light rounded shadow-sm p-3" ref="graphContainer">
-            <div class="fullscreen-wrapper" aria-label="Agrandar imagen" role="button">
-                <span class="fullscreen-text">Ver más grande</span>
-                <svg
-                    @click="toggleFullscreen"
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    fill="currentColor"
-                    class="fullscreen-icon"
-                    viewBox="0 0 16 16">
-                    <!-- Path del icono -->
-                    <path d="..." />
-                </svg>
+            <div class="d-flex justify-content-end flex-column align-items-end">
+                <div
+                    class="fullscreen-wrapper"
+                    aria-label="Agrandar imagen"
+                    role="button"
+                    @click="toggleFullscreen">
+                    <span class="fullscreen-text">Ver más grande</span>
+                    <i
+                        class="bi bi-arrows-fullscreen text-white"
+                        style="font-size: 14px; cursor: pointer">
+                    </i>
+                </div>
+
+                <div
+                    class="fullscreen-wrapper mt-4 mt-smaller d-flex align-items-center justify-content-between"
+                    aria-label="Ordenar Esquema"
+                    role="button"
+                    style="padding-top: 2px; padding-bottom: 2px; padding-left: 0">
+                    <span class="fullscreen-text">Ordenar Esquema</span>
+                    <div
+                        class="form-check"
+                        style="
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;
+                            width: 16px;
+                            height: 16px;
+                        ">
+                        <input
+                            class="form-check-input"
+                            type="checkbox"
+                            v-model="d3ForceEnabled"
+                            id="d3ForceCheck"
+                            style="
+                                width: 16px;
+                                height: 16px;
+                                cursor: pointer;
+                                margin: 0;
+                                position: relative;
+                                top: 1px;
+                                left: -7px;
+                            " />
+                        <label class="form-check-label visually-hidden" for="d3ForceCheck"> </label>
+                    </div>
+                </div>
             </div>
 
+            <!-- <div class="d-flex justify-content-between align-items-end">
+                <div
+                    class="fullscreen-wrapper"
+                    aria-label="Agrandar imagen"
+                    role="button"
+                    @click="toggleFullscreen"
+                    v-tippy="'Ver más grande'">
+
+                    <i
+                        class="bi bi-arrows-fullscreen text-white"
+                        style="font-size: 14px; cursor: pointer">
+                    </i>
+                </div>
+                <div
+                    class="fullscreen-wrapper"
+                    aria-label="Agrandar imagen"
+                    role="button"
+                    @click="toggleFullscreen"
+                    v-tippy="'Ver más grande'">
+
+                    <i
+                        class="bi bi-arrows-fullscreen text-white"
+                        style="font-size: 14px; cursor: pointer">
+                    </i>
+                </div>
+            </div>
+        -->
             <v-network-graph
                 v-model:selected-nodes="selectedNodes"
                 v-model:selected-edges="selectedEdges"
@@ -617,7 +676,9 @@
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 id="addNodeModalLabel" class="modal-title">Crear Nodo Hijo</h5>
+                        <h5 id="addNodeModalLabel" class="modal-title">
+                            <i class="bi bi-plus-circle text-warning"></i> Crear Nodo Hijo
+                        </h5>
                         <button
                             type="button"
                             class="btn-close"
@@ -662,7 +723,10 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button class="btn btn-secondary" type="button" @click="closeAddNodeModal">
+                        <button
+                            class="btn btn-warning text-white"
+                            type="button"
+                            @click="closeAddNodeModal">
                             Cancelar
                         </button>
                         <button class="btn btn-primary" type="button" @click="confirmAddNode">
@@ -699,7 +763,7 @@
         align-items: center;
         background-color: #ec540c; /* Fondo rojo siempre visible */
         border-radius: 4px 4px 4px;
-        padding: 4px 8px;
+        padding: 4px 10px;
         cursor: pointer;
         transition: background-color 0.3s ease-in-out;
         z-index: 2000;
@@ -730,7 +794,7 @@
 
         font-family: "Outfit", sans-serif; /* Asegúrate de que la fuente esté cargada */
         background-color: #ec540c; /* Fondo rojo */
-        padding: 2px 6px; /* Padding para el texto */
+        padding: 2.6px 6px; /* Padding para el texto */
         border-radius: 4px 0 0 4px; /* Bordes redondeados opcionales */
         transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out,
             visibility 0.3s ease-in-out;
@@ -841,5 +905,9 @@
 
     .close-btn:hover {
         color: #e63946;
+    }
+
+    .mt-smaller {
+        margin-top: 2rem !important; /* Ajusta el valor según lo necesites */
     }
 </style>
