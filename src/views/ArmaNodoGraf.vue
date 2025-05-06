@@ -1,6 +1,7 @@
 <script setup lang="ts">
-    import { reactive, ref, onMounted, computed, watchEffect, watch } from "vue";
+    import { reactive, ref, onMounted, computed, watchEffect, watch, nextTick } from "vue";
     import * as vNG from "v-network-graph";
+    import { defineConfigs, EventHandlers } from "v-network-graph";
     import { ForceLayout } from "v-network-graph/lib/force-layout";
     import data from "../data";
 
@@ -18,6 +19,62 @@
     const newNodeName = ref<string>("");
     const graph = ref<vNG.Instance | null>(null);
     const graphContainer = ref<HTMLDivElement | null>(null);
+
+    // box-selection
+    const isBoxSelectionMode = ref(false);
+
+    // 3) Lista de tooltips para la selección
+    const selectionTooltips = ref<Array<{ id: string; left: string; top: string; data: any }>>([]);
+
+    // 4) Gap vertical
+    const verticalGap = 8;
+
+    // 5) Función para recomputar tooltips de selección
+    function updateSelectionTooltips() {
+        if (!graph.value) {
+            selectionTooltips.value = [];
+            return;
+        }
+        selectionTooltips.value = selectedNodes.value.map((id) => {
+            const nodeData = nodes[id];
+            const layout = layouts.nodes[id];
+            const dom = graph.value!.translateFromSvgToDomCoordinates(layout);
+            return {
+                id,
+                data: {
+                    name: nodeData.name,
+                    ...nodeData.data, // rut, tipo, capitalEnterado, lineaNegocio
+                    x: layout.x.toFixed(2),
+                    y: layout.y.toFixed(2),
+                },
+                left: `${dom.x - 75}px`,
+                top: `${dom.y - 50 - verticalGap}px`,
+            };
+        });
+    }
+
+    function startBoxSelection() {
+        // inicia el modo caja en “manual stop” (no sale al click ni ESC)
+        graph.value?.startBoxSelection({ stop: "manual" });
+        isBoxSelectionMode.value = true;
+        updateSelectionTooltips();
+    }
+
+    // Detener selección por caja
+    // function stopBoxSelection() {
+    //     graph.value?.stopBoxSelection(); // llama al método de la instancia <v-network-graph>
+    //     isBoxSelectionMode.value = false;
+    //     selectionTooltips.value = [];
+    // }
+
+    function stopBoxSelection() {
+        graph.value?.stopBoxSelection();
+        isBoxSelectionMode.value = false;
+        selectionTooltips.value = [];
+        // 👉 Aquí borramos la selección visual
+        selectedNodes.value = [];
+        selectedEdges.value = [];
+    }
 
     const d3ForceEnabled = computed({
         get: () => configs.view?.layoutHandler instanceof ForceLayout,
@@ -38,6 +95,15 @@
                 layoutHandler: new ForceLayout(),
                 panEnabled: true,
                 zoomEnabled: true,
+                boxSelectionEnabled: false,
+                selection: {
+                    box: {
+                        color: "#0000ff20",
+                        strokeWidth: 1,
+                        strokeColor: "#aaaaff",
+                        strokeDasharray: "0",
+                    },
+                },
             },
             node: {
                 normal: {
@@ -121,7 +187,7 @@
                 const domPoint = graph.value.translateFromSvgToDomCoordinates(nodeLayout);
                 tooltipPos.value = {
                     left: `${domPoint.x - tooltip.value.offsetWidth / 2}px`,
-                    top: `${domPoint.y - tooltip.value.offsetHeight - 20}px`,
+                    top: `${domPoint.y - tooltip.value.offsetHeight - 5}px`,
                 };
             }
         }
@@ -129,6 +195,8 @@
 
     const eventHandlers: vNG.EventHandlers = {
         "node:click": ({ node }) => {
+            // si estamos en modo box-selection, no disparamos el click
+            if (isBoxSelectionMode.value) return;
             closeTooltip("node");
             const nodeData = nodes[node];
             const nodeLayout = layouts.nodes[node];
@@ -143,13 +211,14 @@
                 };
                 tooltipPos.value = {
                     left: `${domPoint.x - tooltip.value.offsetWidth / 2}px`,
-                    top: `${domPoint.y - tooltip.value.offsetHeight - 20}px`,
+                    top: `${domPoint.y - tooltip.value.offsetHeight - 5}px`,
                 };
                 tooltipOpacity.value = 1;
                 targetNodeId.value = node;
             }
         },
         "edge:click": (event: vNG.EdgeEvent<MouseEvent>) => {
+            if (isBoxSelectionMode.value) return;
             closeTooltip("edge");
             const edge = event.edge;
             if (!edge) return;
@@ -173,11 +242,19 @@
                 };
                 edgeTooltipPos.value = {
                     left: `${domPoint.x - edgeTooltip.value.offsetWidth / 2}px`,
-                    top: `${domPoint.y - edgeTooltip.value.offsetHeight - 20}px`,
+                    top: `${domPoint.y - edgeTooltip.value.offsetHeight - 5}px`,
                 };
                 edgeTooltipOpacity.value = 1;
                 targetEdgeId.value = edge;
             }
+        },
+        // detectar cambio a modo box-selection
+        "view:mode": (mode: string) => {
+            if (mode === "box-selection") {
+                isBoxSelectionMode.value = true;
+                updateSelectionTooltips();
+            }
+            // omitimos el clear automático al salir de box-selection
         },
     };
 
@@ -339,6 +416,17 @@
         }
     }
 
+    // 7) Watchers al final, **después** de todas las declaraciones
+    // Recalcular tooltips cada vez que cambie la selección
+    watch(
+        () => selectedNodes.value.slice(),
+        () => {
+            if (isBoxSelectionMode.value) {
+                updateSelectionTooltips();
+            }
+        }
+    );
+
     function saveNodes() {
         const currentGraphState = {
             nodes: { ...nodes },
@@ -379,6 +467,16 @@
             }
         }
     }
+
+    onMounted(() => {
+        data.loadNodesFromJson();
+        nextTick(() => {
+            // Centra y ajusta el zoom para que encaje todo el grafo
+            graph.value?.fitToContents();
+            // Si quieres sin márgenes, puedes pasar { margin: 0 }:
+            // graph.value?.fitToContents({ margin: 0 });
+        });
+    });
 </script>
 
 <template>
@@ -432,7 +530,7 @@
                     </div>
 
                     <!-- Checkbox para habilitar Force Layout -->
-                    <div class="col-md-6 mt-3">
+                    <!-- <div class="col-md-6 mt-3">
                         <div class="p-3 bg-light rounded shadow-sm">
                             <h6 class="text-primary mb-3">
                                 <strong>Configuración de Layout</strong>
@@ -448,7 +546,7 @@
                                 </label>
                             </div>
                         </div>
-                    </div>
+                    </div> -->
 
                     <!-- Renombrar Nodo -->
                     <div class="col-md-6 mt-3">
@@ -565,6 +663,25 @@
                 </div>
             </div>
         -->
+            <div class="demo-control-panel">
+                <button
+                    @click="stopBoxSelection"
+                    class="btn btn-outline-secondary btn-sm"
+                    :disabled="!isBoxSelectionMode">
+                    Detener selección
+                </button>
+
+                <button
+                    @click="startBoxSelection"
+                    :class="[
+                        'btn btn-sm',
+                        isBoxSelectionMode ? 'btn-primary active' : 'btn-outline-primary',
+                    ]"
+                    :disabled="isBoxSelectionMode"
+                    aria-pressed="isBoxSelectionMode">
+                    Selección por Caja
+                </button>
+            </div>
             <v-network-graph
                 v-model:selected-nodes="selectedNodes"
                 v-model:selected-edges="selectedEdges"
@@ -597,6 +714,28 @@
                 </template>
             </v-network-graph>
 
+            <!-- tooltips persistentes para los nodos seleccionados -->
+            <div v-if="isBoxSelectionMode">
+                <div
+                    v-for="tip in selectionTooltips"
+                    :key="tip.id"
+                    class="selection-tooltip"
+                    :style="{ left: tip.left, top: tip.top }">
+                    <div><strong>Nombre:</strong> {{ tip.data.name }}</div>
+                    <div v-if="tip.data.rut"><strong>RUT:</strong> {{ tip.data.rut }}</div>
+                    <div v-if="tip.data.tipo"><strong>Tipo:</strong> {{ tip.data.tipo }}</div>
+                    <div v-if="tip.data.capitalEnterado">
+                        <strong>Capital Enterado:</strong> {{ tip.data.capitalEnterado }}
+                    </div>
+                    <div v-if="tip.data.lineaNegocio">
+                        <strong>Línea de Negocio:</strong> {{ tip.data.lineaNegocio }}
+                    </div>
+                    <!-- <div><strong>Posición:</strong> ({{ tip.data.x }}, {{ tip.data.y }})</div> -->
+                </div>
+            </div>
+
+            <div v-if="isBoxSelectionMode" class="mode-indicator">Modo selección por caja</div>
+
             <!-- Tooltip Nodos -->
             <div ref="tooltip" class="tooltip" :style="{ ...tooltipPos, opacity: tooltipOpacity }">
                 <button class="close-btn" @click="closeTooltip('node')">×</button>
@@ -611,7 +750,7 @@
                         <strong>Línea de Negocio:</strong> {{ tooltipData.data.lineaNegocio }}
                     </div>
                 </div>
-                <div><strong>Posición:</strong> ({{ tooltipData.x }}, {{ tooltipData.y }})</div>
+                <!-- <div><strong>Posición:</strong> ({{ tooltipData.x }}, {{ tooltipData.y }})</div> -->
             </div>
 
             <!-- Tooltip Aristas -->
@@ -751,6 +890,7 @@
         background-color: #ffffff;
         padding: 20px;
         position: relative;
+        overflow: auto; /* <— permite scroll si los nodos se salen */
     }
 
     /* Estilos para el contenedor del ícono de fullscreen */
@@ -882,6 +1022,7 @@
         transition: opacity 0.2s ease-in-out;
         z-index: 1000;
         opacity: 0;
+        margin-top: 39px;
     }
 
     .tooltip .close-btn {
@@ -909,5 +1050,54 @@
 
     .mt-smaller {
         margin-top: 2rem !important; /* Ajusta el valor según lo necesites */
+    }
+
+    .mode-indicator {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        padding: 4px 10px;
+        background-color: #0064a0;
+        color: #ffffff;
+        font-style: italic;
+        border-radius: 4px;
+        pointer-events: none;
+        font-size: 12px;
+    }
+
+    .demo-control-panel {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .color-fondo {
+        background-color: #0064a0;
+        color: #ffffff;
+    }
+
+    .selection-tooltip {
+        position: absolute;
+        width: 140px;
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid #bbb;
+        padding: 6px 8px;
+        border-radius: 4px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        pointer-events: none;
+        font-size: 12px;
+        z-index: 9999;
+        white-space: normal;
+        word-wrap: break-word;
+    }
+    .btn-primary.active,
+    .btn-primary.disabled,
+    .btn-primary:disabled {
+        /* Bootstrap normalmente baja la opacidad al disabled, lo revertimos */
+        opacity: 1 !important;
+        color: #fff !important;
+        background-color: #0064a0 !important; /* mismo tono primario */
+        border-color: #0064a0 !important;
+        cursor: default;
     }
 </style>
