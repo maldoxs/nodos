@@ -3,7 +3,9 @@
     import * as vNG from "v-network-graph";
     import { defineConfigs, EventHandlers } from "v-network-graph";
     import { ForceLayout } from "v-network-graph/lib/force-layout";
+
     import data from "../data";
+    import ExcelExportButton from "../components/ExcelExportButton.vue";
 
     // Asegúrate de tener v-network-graph instalado: npm install v-network-graph
     // Asegúrate de tener Bootstrap CSS/JS en tu index.html o main.js
@@ -60,18 +62,10 @@
         updateSelectionTooltips();
     }
 
-    // Detener selección por caja
-    // function stopBoxSelection() {
-    //     graph.value?.stopBoxSelection(); // llama al método de la instancia <v-network-graph>
-    //     isBoxSelectionMode.value = false;
-    //     selectionTooltips.value = [];
-    // }
-
     function stopBoxSelection() {
         graph.value?.stopBoxSelection();
         isBoxSelectionMode.value = false;
         selectionTooltips.value = [];
-        // 👉 Aquí borramos la selección visual
         selectedNodes.value = [];
         selectedEdges.value = [];
     }
@@ -477,6 +471,19 @@
             // graph.value?.fitToContents({ margin: 0 });
         });
     });
+
+    function onSelectedNodesUpdate(newSelection: string[]) {
+        // Si estamos en modo caja y va a limpiarse (newSelection=[]), lo ignoramos:
+        if (isBoxSelectionMode.value && newSelection.length === 0) {
+            return;
+        }
+        // En cualquier otro caso, aceptamos la nueva selección:
+        selectedNodes.value = newSelection;
+        // Y si estamos en modo caja, refrescamos tooltips:
+        if (isBoxSelectionMode.value) {
+            updateSelectionTooltips();
+        }
+    }
 </script>
 
 <template>
@@ -487,43 +494,58 @@
                 <h6 class="m-0">Panel de Acciones</h6>
             </div>
             <div class="card-body">
-                <div class="row gy-3">
+                <div class="row gx-3 gy-3 align-items-stretch p-1">
                     <!-- Gestión de Nodos -->
-                    <div class="col-md-6">
-                        <div class="p-3 bg-light rounded shadow-sm">
-                            <h6 class="text-primary mb-3"><strong>Gestión de Nodos</strong></h6>
-                            <div class="d-flex flex-wrap gap-2">
-                                <button
-                                    class="btn btn-danger btn-sm px-3"
+                    <div class="col-md-6 d-flex">
+                        <div class="section-info d-flex flex-column flex-fill">
+                            <!-- header centrado -->
+                            <div
+                                class="section-info__header d-flex justify-content-center align-items-center mb-1">
+                                <i class="bi bi-diagram-3-fill icon-lg me-2"></i>
+                                <h6 class="mb-0">Gestión de Nodos</h6>
+                            </div>
+                            <!-- acciones abajo, centradas -->
+                            <div
+                                class="section-info__actions d-flex justify-content-center gap-2 mt-auto">
+                                <p
+                                    class="sii-btn sii-btn-gray"
                                     :disabled="selectedNodes.length === 0"
                                     @click="removeNode">
-                                    <i class="fas fa-trash-alt me-1"></i> Eliminar Nodo
-                                </button>
-                                <button
-                                    class="btn btn-primary btn-sm px-3"
-                                    @click="openAddNodeModal">
-                                    <i class="fas fa-plus-circle me-1"></i> Crear Nodo
+                                    <i class="fas fa-trash-alt me-1"></i>
+                                    Eliminar Nodo
+                                </p>
+                                <button class="sii-btn sii-btn-secondary" @click="openAddNodeModal">
+                                    <i class="fas fa-plus-circle me-1"></i>
+                                    Crear Nodo
                                 </button>
                             </div>
                         </div>
                     </div>
 
                     <!-- Gestión de Aristas -->
-                    <div class="col-md-6">
-                        <div class="p-3 bg-light rounded shadow-sm">
-                            <h6 class="text-primary mb-3"><strong>Gestión de Aristas</strong></h6>
-                            <div class="d-flex flex-wrap gap-2">
+                    <div class="col-md-6 d-flex">
+                        <div class="section-info d-flex flex-column flex-fill">
+                            <!-- header centrado -->
+                            <div
+                                class="section-info__header d-flex justify-content-center align-items-center mb-1">
+                                <i class="bi bi-link-45deg icon-lg me-2"></i>
+                                <h6 class="mb-0">Gestión de Aristas</h6>
+                            </div>
+                            <!-- acciones abajo, centradas -->
+                            <div class="section-info__actions d-flex justify-content-center gap-2">
                                 <button
-                                    class="btn btn-primary btn-sm px-3"
-                                    :disabled="selectedNodes.length !== 2"
-                                    @click="addEdge">
-                                    <i class="fas fa-link me-1"></i> Crear Arista
-                                </button>
-                                <button
-                                    class="btn btn-danger btn-sm px-3"
+                                    class="sii-btn sii-btn-gray"
                                     :disabled="selectedEdges.length === 0"
                                     @click="removeEdge">
-                                    <i class="fas fa-unlink me-1"></i> Eliminar Arista
+                                    <i class="bi bi-unlink me-1"></i>
+                                    Eliminar Arista
+                                </button>
+                                <button
+                                    class="sii-btn sii-btn-secondary"
+                                    :disabled="selectedNodes.length !== 2"
+                                    @click="addEdge">
+                                    <i class="fas fa-link me-1"></i>
+                                    Crear Arista
                                 </button>
                             </div>
                         </div>
@@ -549,34 +571,51 @@
                     </div> -->
 
                     <!-- Renombrar Nodo -->
-                    <div class="col-md-6 mt-3">
-                        <div class="p-3 bg-light rounded shadow-sm">
-                            <h6 class="text-primary mb-3"><strong>Renombrar Nodo</strong></h6>
-                            <div class="d-flex flex-column gap-2">
+                    <div class="col-md-6 d-flex mt-3">
+                        <div class="section-info d-flex flex-column flex-fill">
+                            <!-- header centrado -->
+                            <div class="section-info__header">
+                                <i class="bi bi-pencil icon-lg icon-lg icon-lg2"></i>
+                                <h6>Renombrar Nodo</h6>
+                            </div>
+                            <!-- acciones abajo -->
+                            <div
+                                class="section-info__actions d-flex flex-column gap-2 mt-auto w-75">
                                 <input
                                     type="text"
                                     v-model="newNodeName"
                                     class="form-control form-control-sm"
                                     placeholder="Nuevo Nombre del Nodo" />
                                 <button
-                                    class="btn btn-secondary btn-sm px-3"
+                                    class="btn btn-secondary btn-sm"
                                     :disabled="selectedNodes.length !== 1"
                                     @click="updateNodeName">
-                                    <i class="fas fa-edit me-1"></i> Cambiar Nombre
+                                    <i class="fas fa-edit me-1"></i>
+                                    Cambiar Nombre
                                 </button>
                             </div>
                         </div>
                     </div>
 
                     <!-- Exportar -->
-                    <div class="col-md-6 mt-3">
-                        <div class="p-3 bg-light rounded shadow-sm">
-                            <h6 class="text-primary mb-3"><strong>Exportar</strong></h6>
-                            <button
-                                class="btn btn-primary btn-sm btn-download"
-                                @click="downloadAsSvg">
-                                Descargar SVG
-                            </button>
+                    <!-- Exportar -->
+                    <div class="col-md-6 d-flex mt-3">
+                        <div class="section-info d-flex flex-column flex-fill">
+                            <!-- header centrado -->
+                            <div
+                                class="section-info__header d-flex justify-content-center align-items-center mb-1 me-5">
+                                <!-- Icono de exportar -->
+                                <i class="bi bi-file-earmark-arrow-down icon-lg icon-lg2 me-2"></i>
+                                <h6 class="mb-0">Exportar</h6>
+                            </div>
+                            <!-- acciones abajo, centradas -->
+                            <div
+                                class="section-info__actions d-flex justify-content-center gap-2 mt-3">
+                                <button class="sii-btn sii-btn-gray btn-sm" @click="downloadAsSvg">
+                                    <i class="bi bi-download me-1"></i>
+                                    Descargar SVG
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -666,24 +705,28 @@
             <div class="demo-control-panel">
                 <button
                     @click="stopBoxSelection"
-                    class="btn btn-outline-secondary btn-sm"
+                    class="sii-btn sii-btn-gray btn-sm"
                     :disabled="!isBoxSelectionMode">
                     Detener selección
                 </button>
 
                 <button
                     @click="startBoxSelection"
-                    :class="[
-                        'btn btn-sm',
-                        isBoxSelectionMode ? 'btn-primary active' : 'btn-outline-primary',
-                    ]"
+                    class="sii-btn sii-btn-secondary"
                     :disabled="isBoxSelectionMode"
                     aria-pressed="isBoxSelectionMode">
                     Selección por Caja
                 </button>
+                <!-- Componente: Exportar a Excel -->
+                <ExcelExportButton
+                    :isBoxMode="isBoxSelectionMode"
+                    :selectedNodes="selectedNodes"
+                    :nodes="nodes"
+                    :layouts="layouts.nodes" />
             </div>
             <v-network-graph
-                v-model:selected-nodes="selectedNodes"
+                :selected-nodes="selectedNodes"
+                @update:selected-nodes="onSelectedNodesUpdate"
                 v-model:selected-edges="selectedEdges"
                 :nodes="nodes"
                 :edges="edges"
@@ -1099,5 +1142,13 @@
         background-color: #0064a0 !important; /* mismo tono primario */
         border-color: #0064a0 !important;
         cursor: default;
+    }
+
+    .icon-lg {
+        font-size: 4rem; /* o cualquier otro valor */
+    }
+
+    .icon-lg2 {
+        font-size: 3rem;
     }
 </style>

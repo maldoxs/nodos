@@ -10,8 +10,8 @@ $green: #198754 !default;
 $teal: #20c997 !default;
 $cyan: #0dcaf0 !default;
 
-$naranjo_marca: #ec540c !default; //naranjo sii intranet
-$azul-marca: #0464a4 !default; //azul sii intranet
+$naranjo_marca: #ec540c !default; // naranjo SII intranet
+$azul-marca: #0464a4 !default; // azul SII intranet
 $gris-marca: #737373 !default;
 
 $gris-texto-iconos: #333333 !default;
@@ -24,7 +24,6 @@ $gris-fondo-caja: #F5F5F5 !default;
 $rojo-secundario-botones-textos: #E22C2C !default;
 $azul-secundario-footer-menu: #002C48 !default;
 $azul-secundario-top: #002C48 !default;
-//$azul-secundario-top: $azul-marca;
 
 $azul-secundario-link-iconos: #0F69B4 !default;
 $verde-secundario-botones-iconos: #00B050 !default;
@@ -32,22 +31,17 @@ $amarillo-secundario-botones-textos: #FFC000 !default;
 $purpura-secundario-botones-iconos-fondos: #723E72 !default;
 $cyan-secundario-botones-iconos: #6DC1D5 !default;
 
-
-$primary: $azul-secundario-top !default;
+// Mapear colores de Bootstrap a la paleta SII
+$primary: $azul-marca !default;
 $secondary: $gris-marca !default;
 $success: $green !default;
 $info: $cyan !default;
 $warning: $naranjo_marca !default;
 $danger: $rojo-secundario-botones-textos !default;
 $light: #dee2e6 !default;
-; // color de los textos del cuerpo
 $dark: $gris-texto-iconos !default;
-//$body_color: tint-color($cyan, 40%) !default; //con esto se define que el color de texto por default será el gris claro
 
-
-
-
-// Puedes crear alias o renombrar estilos
+// Alias de botones personalizados
 .btn-custom {
     @extend .btn-primary;
     background-color: $primary;
@@ -57,9 +51,136 @@ $dark: $gris-texto-iconos !default;
     }
 }
 
-
-// Importa funciones y variables de Bootstrap
+// Importar funciones y variables de Bootstrap
 @import "bootstrap/scss/_functions";
 @import "bootstrap/scss/_variables";
-// Importa los estilos completos de Bootstrap después de personalizar las variables
+
+// Importar los estilos completos de Bootstrap después de personalizar las variables
 @import "bootstrap/scss/bootstrap";
+
+// color de texto con tu azul de marca
+.zul-secundario {
+    color: $azul-secundario-top !important;
+}
+
+// ================================
+// Estilos globales SII: Botones estándar
+// ================================
+
+.sii-btn {
+    width: 140px;
+    height: 35px;
+    font-family: Arial, sans-serif;
+    font-size: 15px;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-transform: none;
+    cursor: pointer;
+    border: none;
+}
+
+/* Botón primario: Naranja SII (warning) */
+.sii-btn-primary {
+    background-color: $warning;
+    color: #ffffff;
+}
+
+.sii-btn-primary:hover:not(:disabled) {
+    background-color: darken($warning, 10%);
+}
+
+/* Botón secundario: Azul SII (primary) */
+.sii-btn-secondary {
+    background-color: $azul-marca;
+    color: #ffffff;
+}
+
+.sii-btn-secondary:hover:not(:disabled) {
+    background-color: darken($azul-marca, 10%);
+}
+
+/* Botón neutro/inactivo: Gris claro (light) */
+.sii-btn-gray {
+    background-color: $light;
+    color: #333333;
+}
+
+.sii-btn-gray:hover:not(:disabled) {
+    background-color: darken($light, 10%);
+}
+
+/* Estado disabled */
+.sii-btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+
+
+
+.section-info {
+    border: 1px solid #d2d2d2;
+    background-color: $gris-fondo-caja;
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+
+    /* Centra todo el contenido */
+    align-items: center;
+    text-align: center;
+
+    &__header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.5rem;
+
+        .icon-lg {
+            font-size: 1.5rem;
+            color: $primary;
+        }
+
+        h6 {
+            margin: 0;
+            color: $dark;
+            font-size: 1.25rem;
+            font-weight: bold;
+        }
+    }
+
+    &__actions {
+        display: flex;
+        gap: 1.5rem;
+        /* centra los enlaces */
+        justify-content: center;
+    }
+
+    /* Estilo para los enlaces de acción */
+    &__actions a {
+        font-weight: 500;
+        text-decoration: none;
+        padding: 0.25rem 0.75rem;
+        border-radius: 4px;
+    }
+
+    &__actions a.link-primary {
+        color: #fff;
+        background-color: $primary;
+    }
+
+    &__actions a.link-secondary {
+        color: #333;
+        background-color: $gris-fondo-caja;
+        border: 1px solid darken($gris-fondo-caja, 10%);
+    }
+
+    &__actions a:hover {
+        text-decoration: none;
+        opacity: 0.85;
+    }
+}
