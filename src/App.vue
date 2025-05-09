@@ -138,8 +138,9 @@
 <template>
     <div class="container p-3 mb-4 pt-0">
         <nav class="p-3">
-            <router-link to="/">Home</router-link> |
-            <router-link to="/about">About</router-link>
+            <router-link to="/">Home</router-link> | <router-link to="/about">About</router-link> |
+            <router-link to="/personas">personas</router-link> |
+            <router-link to="/NodoExpandirContraer">NodoExpandirContraer</router-link>
         </nav>
         <router-view></router-view>
     </div>

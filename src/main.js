@@ -1,6 +1,8 @@
 import { createApp } from "vue";
 import App from "./App.vue";
 import router from "./router";
+import "tippy.js/dist/tippy.css"; // Importa los estilos de Tippy.js
+import { plugin as TippyPlugin } from "vue-tippy";
 
 // Importa Element Plus y los iconos
 import ElementPlus from "element-plus";
@@ -28,6 +30,8 @@ app.use(VNetworkGraph);
 
 // Usa el router
 app.use(router);
+
+app.use(TippyPlugin);
 
 // Monta la aplicación en el elemento con ID 'app'
 app.mount("#app");

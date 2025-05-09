@@ -1,9 +1,14 @@
 <script setup lang="ts">
-    import { reactive, ref, onMounted, computed, watchEffect, watch } from "vue";
+    import { reactive, ref, onMounted, computed, watchEffect, watch, nextTick } from "vue";
     import * as vNG from "v-network-graph";
+    import { defineConfigs, EventHandlers } from "v-network-graph";
     import { ForceLayout } from "v-network-graph/lib/force-layout";
-    import { Download } from "@element-plus/icons";
+
     import data from "../data";
+    import ExcelExportButton from "../components/ExcelExportButton.vue";
+
+    // Asegúrate de tener v-network-graph instalado: npm install v-network-graph
+    // Asegúrate de tener Bootstrap CSS/JS en tu index.html o main.js
 
     const nodes = reactive({ ...data.nodes });
     const edges = reactive({ ...data.edges });
@@ -16,6 +21,54 @@
     const newNodeName = ref<string>("");
     const graph = ref<vNG.Instance | null>(null);
     const graphContainer = ref<HTMLDivElement | null>(null);
+
+    // box-selection
+    const isBoxSelectionMode = ref(false);
+
+    // 3) Lista de tooltips para la selección
+    const selectionTooltips = ref<Array<{ id: string; left: string; top: string; data: any }>>([]);
+
+    // 4) Gap vertical
+    const verticalGap = 8;
+
+    // 5) Función para recomputar tooltips de selección
+    function updateSelectionTooltips() {
+        if (!graph.value) {
+            selectionTooltips.value = [];
+            return;
+        }
+        selectionTooltips.value = selectedNodes.value.map((id) => {
+            const nodeData = nodes[id];
+            const layout = layouts.nodes[id];
+            const dom = graph.value!.translateFromSvgToDomCoordinates(layout);
+            return {
+                id,
+                data: {
+                    name: nodeData.name,
+                    ...nodeData.data, // rut, tipo, capitalEnterado, lineaNegocio
+                    x: layout.x.toFixed(2),
+                    y: layout.y.toFixed(2),
+                },
+                left: `${dom.x - 75}px`,
+                top: `${dom.y - 50 - verticalGap}px`,
+            };
+        });
+    }
+
+    function startBoxSelection() {
+        // inicia el modo caja en “manual stop” (no sale al click ni ESC)
+        graph.value?.startBoxSelection({ stop: "manual" });
+        isBoxSelectionMode.value = true;
+        updateSelectionTooltips();
+    }
+
+    function stopBoxSelection() {
+        graph.value?.stopBoxSelection();
+        isBoxSelectionMode.value = false;
+        selectionTooltips.value = [];
+        selectedNodes.value = [];
+        selectedEdges.value = [];
+    }
 
     const d3ForceEnabled = computed({
         get: () => configs.view?.layoutHandler instanceof ForceLayout,
@@ -36,6 +89,15 @@
                 layoutHandler: new ForceLayout(),
                 panEnabled: true,
                 zoomEnabled: true,
+                boxSelectionEnabled: false,
+                selection: {
+                    box: {
+                        color: "#0000ff20",
+                        strokeWidth: 1,
+                        strokeColor: "#aaaaff",
+                        strokeDasharray: "0",
+                    },
+                },
             },
             node: {
                 normal: {
@@ -102,10 +164,7 @@
     });
 
     onMounted(() => {
-        // Primero, cargar los nodos desde el JSON
         data.loadNodesFromJson();
-
-        // Luego, cargar layouts guardados si existen
         const savedLayouts = localStorage.getItem("layouts");
         if (savedLayouts) {
             const parsedLayouts = JSON.parse(savedLayouts);
@@ -122,7 +181,7 @@
                 const domPoint = graph.value.translateFromSvgToDomCoordinates(nodeLayout);
                 tooltipPos.value = {
                     left: `${domPoint.x - tooltip.value.offsetWidth / 2}px`,
-                    top: `${domPoint.y - tooltip.value.offsetHeight - 20}px`,
+                    top: `${domPoint.y - tooltip.value.offsetHeight - 5}px`,
                 };
             }
         }
@@ -130,6 +189,8 @@
 
     const eventHandlers: vNG.EventHandlers = {
         "node:click": ({ node }) => {
+            // si estamos en modo box-selection, no disparamos el click
+            if (isBoxSelectionMode.value) return;
             closeTooltip("node");
             const nodeData = nodes[node];
             const nodeLayout = layouts.nodes[node];
@@ -144,13 +205,14 @@
                 };
                 tooltipPos.value = {
                     left: `${domPoint.x - tooltip.value.offsetWidth / 2}px`,
-                    top: `${domPoint.y - tooltip.value.offsetHeight - 20}px`,
+                    top: `${domPoint.y - tooltip.value.offsetHeight - 5}px`,
                 };
                 tooltipOpacity.value = 1;
                 targetNodeId.value = node;
             }
         },
         "edge:click": (event: vNG.EdgeEvent<MouseEvent>) => {
+            if (isBoxSelectionMode.value) return;
             closeTooltip("edge");
             const edge = event.edge;
             if (!edge) return;
@@ -174,15 +236,23 @@
                 };
                 edgeTooltipPos.value = {
                     left: `${domPoint.x - edgeTooltip.value.offsetWidth / 2}px`,
-                    top: `${domPoint.y - edgeTooltip.value.offsetHeight - 20}px`,
+                    top: `${domPoint.y - edgeTooltip.value.offsetHeight - 5}px`,
                 };
                 edgeTooltipOpacity.value = 1;
                 targetEdgeId.value = edge;
             }
         },
+        // detectar cambio a modo box-selection
+        "view:mode": (mode: string) => {
+            if (mode === "box-selection") {
+                isBoxSelectionMode.value = true;
+                updateSelectionTooltips();
+            }
+            // omitimos el clear automático al salir de box-selection
+        },
     };
 
-    const closeTooltip = (type: string) => {
+    function closeTooltip(type: string) {
         if (type === "node") {
             tooltipOpacity.value = 0;
             targetNodeId.value = "";
@@ -190,7 +260,7 @@
             edgeTooltipOpacity.value = 0;
             targetEdgeId.value = "";
         }
-    };
+    }
 
     async function downloadAsSvg() {
         if (!graph.value) return;
@@ -210,24 +280,94 @@
         }
     }
 
-    const addNode = () => {
+    // Variables para el modal usando Bootstrap (sin Element Plus)
+    const newNodeForm = reactive({
+        nombre: "",
+        rut: "",
+        tipo: "",
+        capitalEnterado: 0,
+        lineaNegocio: "",
+    });
+
+    let addNodeModalInstance: any = null;
+    const addNodeModalEl = ref<HTMLDivElement | null>(null);
+
+    onMounted(() => {
+        loadNodes();
+        addNodeModalEl.value = document.getElementById("addNodeModal") as HTMLDivElement | null;
+    });
+
+    function openAddNodeModal() {
+        newNodeForm.nombre = "";
+        newNodeForm.rut = "";
+        newNodeForm.tipo = "";
+        newNodeForm.capitalEnterado = 0;
+        newNodeForm.lineaNegocio = "";
+
+        if (addNodeModalEl.value) {
+            addNodeModalInstance = new (window as any).bootstrap.Modal(addNodeModalEl.value);
+            addNodeModalInstance.show();
+        }
+    }
+
+    function closeAddNodeModal() {
+        if (addNodeModalInstance) {
+            addNodeModalInstance.hide();
+        }
+    }
+
+    function confirmAddNode() {
+        if (!newNodeForm.nombre || !newNodeForm.rut) {
+            alert("Por favor completa al menos el nombre y el RUT.");
+            return;
+        }
+        addNode(
+            newNodeForm.nombre,
+            newNodeForm.rut,
+            newNodeForm.tipo,
+            newNodeForm.capitalEnterado,
+            newNodeForm.lineaNegocio
+        );
+        closeAddNodeModal();
+    }
+
+    function addNode(
+        name: string,
+        rut: string,
+        tipo: string,
+        capitalEnterado: number,
+        lineaNegocio: string
+    ) {
         const nodeId = `node${nextNodeIndex.value}`;
-        const name = `Nodo ${nextNodeIndex.value}`;
         const x = Math.random() * 400;
         const y = Math.random() * 400;
-        nodes[nodeId] = { name, x, y, size: 15, color: "#0064a0", label: true };
+        nodes[nodeId] = {
+            name,
+            x,
+            y,
+            size: 15,
+            color: "#0064a0",
+            label: true,
+            data: {
+                rut,
+                tipo,
+                capitalEnterado,
+                lineaNegocio,
+            },
+            icon: "&#xe7fd;",
+        };
         layouts.nodes[nodeId] = { x, y };
         nextNodeIndex.value++;
-    };
+    }
 
-    const removeNode = () => {
+    function removeNode() {
         for (const nodeId of selectedNodes.value) {
             delete nodes[nodeId];
         }
         selectedNodes.value = [];
-    };
+    }
 
-    const addEdge = () => {
+    function addEdge() {
         if (selectedNodes.value.length !== 2) {
             alert("Por favor selecciona exactamente dos nodos para crear una arista.");
             return;
@@ -251,16 +391,16 @@
             porcentajeParticipacionUtilidades,
         };
         nextEdgeIndex.value++;
-    };
+    }
 
-    const removeEdge = () => {
+    function removeEdge() {
         for (const edgeId of selectedEdges.value) {
             delete edges[edgeId];
         }
         selectedEdges.value = [];
-    };
+    }
 
-    const updateNodeName = () => {
+    function updateNodeName() {
         if (selectedNodes.value.length === 1) {
             const nodeId = selectedNodes.value[0];
             nodes[nodeId].name = newNodeName.value;
@@ -268,9 +408,20 @@
         } else {
             alert("Por favor selecciona un único nodo para renombrarlo.");
         }
-    };
+    }
 
-    const saveNodes = () => {
+    // 7) Watchers al final, **después** de todas las declaraciones
+    // Recalcular tooltips cada vez que cambie la selección
+    watch(
+        () => selectedNodes.value.slice(),
+        () => {
+            if (isBoxSelectionMode.value) {
+                updateSelectionTooltips();
+            }
+        }
+    );
+
+    function saveNodes() {
         const currentGraphState = {
             nodes: { ...nodes },
             edges: { ...edges },
@@ -279,9 +430,9 @@
         };
         localStorage.setItem("savedGraphState", JSON.stringify(currentGraphState));
         alert("Nodos y aristas guardados correctamente.");
-    };
+    }
 
-    const loadNodes = () => {
+    function loadNodes() {
         const savedGraphState = localStorage.getItem("savedGraphState");
         if (savedGraphState) {
             const {
@@ -299,13 +450,8 @@
             nextNodeIndex.value = savedNodeIndex;
             nextEdgeIndex.value = savedEdgeIndex;
         }
-    };
+    }
 
-    onMounted(() => {
-        loadNodes();
-    });
-
-    // Función para activar/desactivar fullscreen usando el ícono
     function toggleFullscreen() {
         if (!document.fullscreenElement) {
             graphContainer.value?.requestFullscreen();
@@ -315,97 +461,160 @@
             }
         }
     }
+
+    onMounted(() => {
+        data.loadNodesFromJson();
+        nextTick(() => {
+            // Centra y ajusta el zoom para que encaje todo el grafo
+            graph.value?.fitToContents();
+            // Si quieres sin márgenes, puedes pasar { margin: 0 }:
+            // graph.value?.fitToContents({ margin: 0 });
+        });
+    });
+
+    function onSelectedNodesUpdate(newSelection: string[]) {
+        // Si estamos en modo caja y va a limpiarse (newSelection=[]), lo ignoramos:
+        if (isBoxSelectionMode.value && newSelection.length === 0) {
+            return;
+        }
+        // En cualquier otro caso, aceptamos la nueva selección:
+        selectedNodes.value = newSelection;
+        // Y si estamos en modo caja, refrescamos tooltips:
+        if (isBoxSelectionMode.value) {
+            updateSelectionTooltips();
+        }
+    }
 </script>
 
 <template>
     <div class="container">
+        <!-- Panel de Acciones -->
         <div class="card p-3 mb-3 shadow-sm">
             <div class="card-header bg-primary text-white">
                 <h6 class="m-0">Panel de Acciones</h6>
             </div>
             <div class="card-body">
-                <div class="row gy-3">
-                    <!-- Sección de acciones de Nodo -->
-                    <div class="col-md-6">
-                        <div class="p-3 bg-light rounded shadow-sm">
-                            <h6 class="text-primary mb-3"><strong>Gestión de Nodos</strong></h6>
-                            <div class="d-flex flex-wrap gap-2">
-                                <button class="btn btn-primary btn-sm px-3" @click="addNode">
-                                    <i class="fas fa-plus-circle me-1"></i> Nodo Hijo
-                                </button>
-                                <button
-                                    class="btn btn-danger btn-sm px-3"
+                <div class="row gx-3 gy-3 align-items-stretch p-1">
+                    <!-- Gestión de Nodos -->
+                    <div class="col-md-6 d-flex">
+                        <div class="section-info d-flex flex-column flex-fill">
+                            <!-- header centrado -->
+                            <div
+                                class="section-info__header d-flex justify-content-center align-items-center mb-1">
+                                <i class="bi bi-diagram-3-fill icon-lg me-2"></i>
+                                <h6 class="mb-0">Gestión de Nodos</h6>
+                            </div>
+                            <!-- acciones abajo, centradas -->
+                            <div
+                                class="section-info__actions d-flex justify-content-center gap-2 mt-auto">
+                                <p
+                                    class="sii-btn sii-btn-gray"
                                     :disabled="selectedNodes.length === 0"
                                     @click="removeNode">
-                                    <i class="fas fa-trash-alt me-1"></i> Eliminar Nodo
+                                    <i class="fas fa-trash-alt me-1"></i>
+                                    Eliminar Nodo
+                                </p>
+                                <button class="sii-btn sii-btn-secondary" @click="openAddNodeModal">
+                                    <i class="fas fa-plus-circle me-1"></i>
+                                    Crear Nodo
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Sección de acciones de Arista -->
-                    <div class="col-md-6">
-                        <div class="p-3 bg-light rounded shadow-sm">
-                            <h6 class="text-primary mb-3"><strong>Gestión de Aristas</strong></h6>
-                            <div class="d-flex flex-wrap gap-2">
+                    <!-- Gestión de Aristas -->
+                    <div class="col-md-6 d-flex">
+                        <div class="section-info d-flex flex-column flex-fill">
+                            <!-- header centrado -->
+                            <div
+                                class="section-info__header d-flex justify-content-center align-items-center mb-1">
+                                <i class="bi bi-link-45deg icon-lg me-2"></i>
+                                <h6 class="mb-0">Gestión de Aristas</h6>
+                            </div>
+                            <!-- acciones abajo, centradas -->
+                            <div class="section-info__actions d-flex justify-content-center gap-2">
                                 <button
-                                    class="btn btn-primary btn-sm px-3"
-                                    :disabled="selectedNodes.length !== 2"
-                                    @click="addEdge">
-                                    <i class="fas fa-link me-1"></i> Crear Arista
-                                </button>
-                                <button
-                                    class="btn btn-danger btn-sm px-3"
+                                    class="sii-btn sii-btn-gray"
                                     :disabled="selectedEdges.length === 0"
                                     @click="removeEdge">
-                                    <i class="fas fa-unlink me-1"></i> Eliminar Arista
+                                    <i class="bi bi-unlink me-1"></i>
+                                    Eliminar Arista
+                                </button>
+                                <button
+                                    class="sii-btn sii-btn-secondary"
+                                    :disabled="selectedNodes.length !== 2"
+                                    @click="addEdge">
+                                    <i class="fas fa-link me-1"></i>
+                                    Crear Arista
                                 </button>
                             </div>
                         </div>
                     </div>
 
                     <!-- Checkbox para habilitar Force Layout -->
-                    <div class="col-md-6 mt-3">
+                    <!-- <div class="col-md-6 mt-3">
                         <div class="p-3 bg-light rounded shadow-sm">
                             <h6 class="text-primary mb-3">
                                 <strong>Configuración de Layout</strong>
                             </h6>
-                            <el-checkbox v-model="d3ForceEnabled" label="D3-Force enabled" />
+                            <div class="form-check">
+                                <input
+                                    class="form-check-input"
+                                    type="checkbox"
+                                    v-model="d3ForceEnabled"
+                                    id="d3ForceCheck" />
+                                <label class="form-check-label" for="d3ForceCheck">
+                                    D3-Force enabled
+                                </label>
+                            </div>
                         </div>
-                    </div>
+                    </div> -->
 
-                    <!-- Sección de cambio de nombre de nodo -->
-                    <div class="col-md-6 mt-3">
-                        <div class="p-3 bg-light rounded shadow-sm">
-                            <h6 class="text-primary mb-3"><strong>Renombrar Nodo</strong></h6>
-                            <div class="d-flex flex-column gap-2">
+                    <!-- Renombrar Nodo -->
+                    <div class="col-md-6 d-flex mt-3">
+                        <div class="section-info d-flex flex-column flex-fill">
+                            <!-- header centrado -->
+                            <div class="section-info__header">
+                                <i class="bi bi-pencil icon-lg icon-lg icon-lg2"></i>
+                                <h6>Renombrar Nodo</h6>
+                            </div>
+                            <!-- acciones abajo -->
+                            <div
+                                class="section-info__actions d-flex flex-column gap-2 mt-auto w-75">
                                 <input
                                     type="text"
                                     v-model="newNodeName"
                                     class="form-control form-control-sm"
                                     placeholder="Nuevo Nombre del Nodo" />
                                 <button
-                                    class="btn btn-secondary btn-sm px-3"
+                                    class="btn btn-secondary btn-sm"
                                     :disabled="selectedNodes.length !== 1"
                                     @click="updateNodeName">
-                                    <i class="fas fa-edit me-1"></i> Cambiar Nombre
+                                    <i class="fas fa-edit me-1"></i>
+                                    Cambiar Nombre
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Sección de descarga -->
-                    <div class="col-md-6 mt-3">
-                        <div class="p-3 bg-light rounded shadow-sm">
-                            <h6 class="text-primary mb-3"><strong>Exportar</strong></h6>
-                            <div>
-                                <el-button
-                                    type="primary"
-                                    class="btn-download"
-                                    @click="downloadAsSvg">
-                                    <el-icon><download /></el-icon>
+                    <!-- Exportar -->
+                    <!-- Exportar -->
+                    <div class="col-md-6 d-flex mt-3">
+                        <div class="section-info d-flex flex-column flex-fill">
+                            <!-- header centrado -->
+                            <div
+                                class="section-info__header d-flex justify-content-center align-items-center mb-1 me-5">
+                                <!-- Icono de exportar -->
+                                <i class="bi bi-file-earmark-arrow-down icon-lg icon-lg2 me-2"></i>
+                                <h6 class="mb-0">Exportar</h6>
+                            </div>
+                            <!-- acciones abajo, centradas -->
+                            <div
+                                class="section-info__actions d-flex justify-content-center gap-2 mt-3">
+                                <button class="sii-btn sii-btn-gray btn-sm" @click="downloadAsSvg">
+                                    <i class="bi bi-download me-1"></i>
                                     Descargar SVG
-                                </el-button>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -417,108 +626,192 @@
                 </button>
             </div>
         </div>
-        <div></div>
 
-        <div>
-            <!-- Aquí podrías tener el componente de la red que utiliza los nodos configurados -->
-        </div>
-
-        <div class="tooltip-wrapper">
-            <div
-                class="network-graph-container bg-light rounded shadow-sm p-3"
-                ref="graphContainer">
-                <!-- NUEVO: Contenedor para el ícono de fullscreen con texto -->
-                <div class="fullscreen-wrapper" aria-label="Agrandar imagen" role="button">
+        <div class="network-graph-container bg-light rounded shadow-sm p-3" ref="graphContainer">
+            <div class="d-flex justify-content-end flex-column align-items-end">
+                <div
+                    class="fullscreen-wrapper"
+                    aria-label="Agrandar imagen"
+                    role="button"
+                    @click="toggleFullscreen">
                     <span class="fullscreen-text">Ver más grande</span>
-                    <svg
-                        @click="toggleFullscreen"
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="24"
-                        height="24"
-                        fill="currentColor"
-                        class="fullscreen-icon"
-                        viewBox="0 0 16 16">
-                        <path
-                            fill-rule="evenodd"
-                            d="M5.828 10.172a.5.5 0 0 0-.707 0l-4.096 4.096V11.5a.5.5 0 0 0-1 0v3.975a.5.5 0 0 0 .5.5H4.5a.5.5 0 0 0 0-1H1.732l4.096-4.096a.5.5 0 0 0 0-.707m4.344 0a.5.5 0 0 1 .707 0l4.096 4.096V11.5a.5.5 0 1 1 1 0v3.975a.5.5 0 0 1-.5.5H11.5a.5.5 0 0 1 0-1h2.768l-4.096-4.096a.5.5 0 0 1 0-.707m0-4.344a.5.5 0 0 0 .707 0l4.096-4.096V4.5a.5.5 0 1 0 1 0V.525a.5.5 0 0 0-.5-.5H11.5a.5.5 0 0 0 0 1h2.768l-4.096 4.096a.5.5 0 0 0 0 .707m-4.344 0a.5.5 0 0 1-.707 0L1.025 1.732V4.5a.5.5 0 0 1-1 0V.525a.5.5 0 0 1 .5-.5H4.5a.5.5 0 0 1 0 1H1.732l4.096 4.096a.5.5 0 0 1 0 .707" />
-                    </svg>
+                    <i
+                        class="bi bi-arrows-fullscreen text-white"
+                        style="font-size: 14px; cursor: pointer">
+                    </i>
                 </div>
 
-                <v-network-graph
-                    v-model:selected-nodes="selectedNodes"
-                    v-model:selected-edges="selectedEdges"
+                <div
+                    class="fullscreen-wrapper mt-4 mt-smaller d-flex align-items-center justify-content-between"
+                    aria-label="Ordenar Esquema"
+                    role="button"
+                    style="padding-top: 2px; padding-bottom: 2px; padding-left: 0">
+                    <span class="fullscreen-text">Ordenar Esquema</span>
+                    <div
+                        class="form-check"
+                        style="
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;
+                            width: 16px;
+                            height: 16px;
+                        ">
+                        <input
+                            class="form-check-input"
+                            type="checkbox"
+                            v-model="d3ForceEnabled"
+                            id="d3ForceCheck"
+                            style="
+                                width: 16px;
+                                height: 16px;
+                                cursor: pointer;
+                                margin: 0;
+                                position: relative;
+                                top: 1px;
+                                left: -7px;
+                            " />
+                        <label class="form-check-label visually-hidden" for="d3ForceCheck"> </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- <div class="d-flex justify-content-between align-items-end">
+                <div
+                    class="fullscreen-wrapper"
+                    aria-label="Agrandar imagen"
+                    role="button"
+                    @click="toggleFullscreen"
+                    v-tippy="'Ver más grande'">
+
+                    <i
+                        class="bi bi-arrows-fullscreen text-white"
+                        style="font-size: 14px; cursor: pointer">
+                    </i>
+                </div>
+                <div
+                    class="fullscreen-wrapper"
+                    aria-label="Agrandar imagen"
+                    role="button"
+                    @click="toggleFullscreen"
+                    v-tippy="'Ver más grande'">
+
+                    <i
+                        class="bi bi-arrows-fullscreen text-white"
+                        style="font-size: 14px; cursor: pointer">
+                    </i>
+                </div>
+            </div>
+        -->
+            <div class="demo-control-panel">
+                <button
+                    @click="stopBoxSelection"
+                    class="sii-btn sii-btn-gray btn-sm"
+                    :disabled="!isBoxSelectionMode">
+                    Detener selección
+                </button>
+
+                <button
+                    @click="startBoxSelection"
+                    class="sii-btn sii-btn-secondary"
+                    :disabled="isBoxSelectionMode"
+                    aria-pressed="isBoxSelectionMode">
+                    Selección por Caja
+                </button>
+                <!-- Componente: Exportar a Excel -->
+                <ExcelExportButton
+                    :isBoxMode="isBoxSelectionMode"
+                    :selectedNodes="selectedNodes"
                     :nodes="nodes"
-                    :edges="edges"
-                    :layouts="layouts"
-                    :configs="configs"
-                    @node-moved="onNodeMoved"
-                    :event-handlers="eventHandlers"
-                    ref="graph">
-                    <!-- Definir la fuente de Material Icons -->
-                    <defs>
-                        <component is="style">
-                            @font-face { font-family: 'Material Icons'; font-style: normal;
-                            font-weight: 400; src:
-                            url(https://fonts.gstatic.com/s/materialicons/v97/flUhRq6tzZclQEJ-Vdg-IuiaDsNcIhQ8tQ.woff2)
-                            format('woff2'); }
-                        </component>
-                    </defs>
+                    :layouts="layouts.nodes" />
+            </div>
+            <v-network-graph
+                :selected-nodes="selectedNodes"
+                @update:selected-nodes="onSelectedNodesUpdate"
+                v-model:selected-edges="selectedEdges"
+                :nodes="nodes"
+                :edges="edges"
+                :layouts="layouts"
+                :configs="configs"
+                @node-moved="onNodeMoved"
+                :event-handlers="eventHandlers"
+                ref="graph">
+                <defs>
+                    <component is="style">
+                        @font-face { font-family: 'Material Icons'; font-style: normal; font-weight:
+                        400; src:
+                        url(https://fonts.gstatic.com/s/materialicons/v97/flUhRq6tzZclQEJ-Vdg-IuiaDsNcIhQ8tQ.woff2)
+                        format('woff2'); }
+                    </component>
+                </defs>
 
-                    <!-- Sobrescribir el nodo para incluir el ícono -->
-                    <template #override-node="{ nodeId, scale, config, ...slotProps }">
-                        <circle
-                            :r="config.radius * scale"
-                            :fill="config.color"
-                            v-bind="slotProps" />
-                        <text
-                            font-family="Material Icons"
-                            :font-size="22 * scale"
-                            fill="#ffffff"
-                            text-anchor="middle"
-                            dominant-baseline="central"
-                            style="pointer-events: none"
-                            v-html="nodes[nodeId].icon" />
-                    </template>
-                </v-network-graph>
+                <template #override-node="{ nodeId, scale, config, ...slotProps }">
+                    <circle :r="config.radius * scale" :fill="config.color" v-bind="slotProps" />
+                    <text
+                        font-family="Material Icons"
+                        :font-size="22 * scale"
+                        fill="#ffffff"
+                        text-anchor="middle"
+                        dominant-baseline="central"
+                        style="pointer-events: none"
+                        v-html="nodes[nodeId].icon" />
+                </template>
+            </v-network-graph>
 
-                <!-- Tooltip dinámico para nodos -->
+            <!-- tooltips persistentes para los nodos seleccionados -->
+            <div v-if="isBoxSelectionMode">
                 <div
-                    ref="tooltip"
-                    class="tooltip"
-                    :style="{ ...tooltipPos, opacity: tooltipOpacity }">
-                    <button class="close-btn" @click="closeTooltip('node')">×</button>
-                    <div><strong>Nombre:</strong> {{ tooltipData.name }}</div>
-                    <div v-if="tooltipData.data">
-                        <div><strong>RUT:</strong> {{ tooltipData.data.rut }}</div>
-                        <div><strong>Tipo:</strong> {{ tooltipData.data.tipo }}</div>
-                        <div v-if="tooltipData.data.capitalEnterado">
-                            <strong>Capital Enterado:</strong>
-                            {{ tooltipData.data.capitalEnterado }}
-                        </div>
-                        <div v-if="tooltipData.data.lineaNegocio">
-                            <strong>Línea de Negocio:</strong> {{ tooltipData.data.lineaNegocio }}
-                        </div>
+                    v-for="tip in selectionTooltips"
+                    :key="tip.id"
+                    class="selection-tooltip"
+                    :style="{ left: tip.left, top: tip.top }">
+                    <div><strong>Nombre:</strong> {{ tip.data.name }}</div>
+                    <div v-if="tip.data.rut"><strong>RUT:</strong> {{ tip.data.rut }}</div>
+                    <div v-if="tip.data.tipo"><strong>Tipo:</strong> {{ tip.data.tipo }}</div>
+                    <div v-if="tip.data.capitalEnterado">
+                        <strong>Capital Enterado:</strong> {{ tip.data.capitalEnterado }}
                     </div>
-                    <div><strong>Posición:</strong> ({{ tooltipData.x }}, {{ tooltipData.y }})</div>
+                    <div v-if="tip.data.lineaNegocio">
+                        <strong>Línea de Negocio:</strong> {{ tip.data.lineaNegocio }}
+                    </div>
+                    <!-- <div><strong>Posición:</strong> ({{ tip.data.x }}, {{ tip.data.y }})</div> -->
                 </div>
+            </div>
 
-                <!-- Tooltip dinámico para aristas -->
-                <div
-                    ref="edgeTooltip"
-                    class="tooltip"
-                    :style="{ ...edgeTooltipPos, opacity: edgeTooltipOpacity }">
-                    <button class="close-btn" @click="closeTooltip('edge')">×</button>
-                    <div>
-                        <strong>{{ edgeTooltipData.name }}</strong>
+            <div v-if="isBoxSelectionMode" class="mode-indicator">Modo selección por caja</div>
+
+            <!-- Tooltip Nodos -->
+            <div ref="tooltip" class="tooltip" :style="{ ...tooltipPos, opacity: tooltipOpacity }">
+                <button class="close-btn" @click="closeTooltip('node')">×</button>
+                <div><strong>Nombre:</strong> {{ tooltipData.name }}</div>
+                <div v-if="tooltipData.data">
+                    <div><strong>RUT:</strong> {{ tooltipData.data.rut }}</div>
+                    <div><strong>Tipo:</strong> {{ tooltipData.data.tipo }}</div>
+                    <div v-if="tooltipData.data.capitalEnterado">
+                        <strong>Capital Enterado:</strong> {{ tooltipData.data.capitalEnterado }}
                     </div>
-                    <div v-if="edgeTooltipData.porcentajeParticipacion !== undefined">
-                        <strong>Porcentaje de Participación:</strong>
-                        {{ edgeTooltipData.porcentajeParticipacion }}%
+                    <div v-if="tooltipData.data.lineaNegocio">
+                        <strong>Línea de Negocio:</strong> {{ tooltipData.data.lineaNegocio }}
                     </div>
-                    <div v-if="edgeTooltipData.porcentajeParticipacionUtilidades !== undefined">
-                        <strong>Porcentaje de Utilidades:</strong>
-                        {{ edgeTooltipData.porcentajeParticipacionUtilidades }}%
-                    </div>
+                </div>
+                <!-- <div><strong>Posición:</strong> ({{ tooltipData.x }}, {{ tooltipData.y }})</div> -->
+            </div>
+
+            <!-- Tooltip Aristas -->
+            <div
+                ref="edgeTooltip"
+                class="tooltip"
+                :style="{ ...edgeTooltipPos, opacity: edgeTooltipOpacity }">
+                <button class="close-btn" @click="closeTooltip('edge')">×</button>
+                <div>
+                    <strong>{{ edgeTooltipData.name }}</strong>
+                </div>
+                <div v-if="edgeTooltipData.porcentajeParticipacion !== undefined">
+                    <strong>Porcentaje de Participación:</strong>
+                    {{ edgeTooltipData.porcentajeParticipacion }}%
+                </div>
+                <div v-if="edgeTooltipData.porcentajeParticipacionUtilidades !== undefined">
+                    <strong>Porcentaje de Utilidades:</strong>
+                    {{ edgeTooltipData.porcentajeParticipacionUtilidades }}%
                 </div>
             </div>
         </div>
@@ -549,13 +842,81 @@
                     </tr>
                     <tr>
                         <td>D3-Force</td>
-                        <td>
-                            Permite que los nodos se distribuyan de manera que la visualización sea
-                            más clara.
-                        </td>
+                        <td>Permite que los nodos se distribuyan de manera más clara.</td>
                     </tr>
                 </tbody>
             </table>
+        </div>
+
+        <!-- Modal Bootstrap para crear nodo -->
+        <div
+            class="modal fade"
+            id="addNodeModal"
+            tabindex="-1"
+            aria-labelledby="addNodeModalLabel"
+            aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 id="addNodeModalLabel" class="modal-title">
+                            <i class="bi bi-plus-circle text-warning"></i> Crear Nodo Hijo
+                        </h5>
+                        <button
+                            type="button"
+                            class="btn-close"
+                            @click="closeAddNodeModal"
+                            aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-2">
+                            <label>Nombre:</label>
+                            <input
+                                v-model="newNodeForm.nombre"
+                                type="text"
+                                class="form-control form-control-sm" />
+                        </div>
+                        <div class="mb-2">
+                            <label>RUT:</label>
+                            <input
+                                v-model="newNodeForm.rut"
+                                type="text"
+                                class="form-control form-control-sm" />
+                        </div>
+                        <div class="mb-2">
+                            <label>Tipo:</label>
+                            <input
+                                v-model="newNodeForm.tipo"
+                                type="text"
+                                class="form-control form-control-sm" />
+                        </div>
+                        <div class="mb-2">
+                            <label>Capital Enterado:</label>
+                            <input
+                                v-model.number="newNodeForm.capitalEnterado"
+                                type="number"
+                                class="form-control form-control-sm" />
+                        </div>
+                        <div class="mb-2">
+                            <label>Línea de Negocio:</label>
+                            <input
+                                v-model="newNodeForm.lineaNegocio"
+                                type="text"
+                                class="form-control form-control-sm" />
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button
+                            class="btn btn-warning text-white"
+                            type="button"
+                            @click="closeAddNodeModal">
+                            Cancelar
+                        </button>
+                        <button class="btn btn-primary" type="button" @click="confirmAddNode">
+                            Crear Nodo
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </template>
@@ -572,6 +933,7 @@
         background-color: #ffffff;
         padding: 20px;
         position: relative;
+        overflow: auto; /* <— permite scroll si los nodos se salen */
     }
 
     /* Estilos para el contenedor del ícono de fullscreen */
@@ -584,7 +946,7 @@
         align-items: center;
         background-color: #ec540c; /* Fondo rojo siempre visible */
         border-radius: 4px 4px 4px;
-        padding: 4px 8px;
+        padding: 4px 10px;
         cursor: pointer;
         transition: background-color 0.3s ease-in-out;
         z-index: 2000;
@@ -615,7 +977,7 @@
 
         font-family: "Outfit", sans-serif; /* Asegúrate de que la fuente esté cargada */
         background-color: #ec540c; /* Fondo rojo */
-        padding: 2px 6px; /* Padding para el texto */
+        padding: 2.6px 6px; /* Padding para el texto */
         border-radius: 4px 0 0 4px; /* Bordes redondeados opcionales */
         transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out,
             visibility 0.3s ease-in-out;
@@ -703,6 +1065,7 @@
         transition: opacity 0.2s ease-in-out;
         z-index: 1000;
         opacity: 0;
+        margin-top: 39px;
     }
 
     .tooltip .close-btn {
@@ -726,5 +1089,66 @@
 
     .close-btn:hover {
         color: #e63946;
+    }
+
+    .mt-smaller {
+        margin-top: 2rem !important; /* Ajusta el valor según lo necesites */
+    }
+
+    .mode-indicator {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        padding: 4px 10px;
+        background-color: #0064a0;
+        color: #ffffff;
+        font-style: italic;
+        border-radius: 4px;
+        pointer-events: none;
+        font-size: 12px;
+    }
+
+    .demo-control-panel {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .color-fondo {
+        background-color: #0064a0;
+        color: #ffffff;
+    }
+
+    .selection-tooltip {
+        position: absolute;
+        width: 140px;
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid #bbb;
+        padding: 6px 8px;
+        border-radius: 4px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        pointer-events: none;
+        font-size: 12px;
+        z-index: 9999;
+        white-space: normal;
+        word-wrap: break-word;
+    }
+    .btn-primary.active,
+    .btn-primary.disabled,
+    .btn-primary:disabled {
+        /* Bootstrap normalmente baja la opacidad al disabled, lo revertimos */
+        opacity: 1 !important;
+        color: #fff !important;
+        background-color: #0064a0 !important; /* mismo tono primario */
+        border-color: #0064a0 !important;
+        cursor: default;
+    }
+
+    .icon-lg {
+        font-size: 4rem; /* o cualquier otro valor */
+    }
+
+    .icon-lg2 {
+        font-size: 3rem;
     }
 </style>

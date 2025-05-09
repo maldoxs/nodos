@@ -13,6 +13,16 @@ const routes = [
         name: "about",
         component: () => import("../views/AboutView.vue"),
     },
+    {
+        path: "/personas",
+        name: "personas",
+        component: () => import("../components/FormularioPersonas.vue"),
+    },
+    {
+        path: "/NodoExpandirContraer",
+        name: "NodoExpandirContraer",
+        component: () => import("../components/NodoExpandirContraer.vue"),
+    },
 ];
 
 // Usa la variable de entorno VITE_APP_CTX
