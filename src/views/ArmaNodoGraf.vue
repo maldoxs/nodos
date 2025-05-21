@@ -3,6 +3,7 @@
     import * as vNG from "v-network-graph";
     import { defineConfigs, EventHandlers } from "v-network-graph";
     import { ForceLayout } from "v-network-graph/lib/force-layout";
+    import { Tooltip } from "bootstrap";
 
     import data from "../data";
     import ExcelExportButton from "../components/ExcelExportButton.vue";
@@ -161,6 +162,24 @@
             const parsedLayouts = JSON.parse(savedLayouts);
             Object.assign(layouts.nodes, parsedLayouts.nodes);
         }
+    });
+
+    onMounted(() => {
+        nextTick(() => {
+            // Reinicia (o crea) TODOS los tooltips sobre los botones
+            document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
+                // Destruye cualquiera anterior
+                const prev = Tooltip.getInstance(el);
+                prev && prev.dispose();
+
+                // Crea el nuevo dentro de #graph-container
+                new Tooltip(el, {
+                    placement: "right",
+                    container: "#graph-container", // 🔑  ahora vive dentro
+                    boundary: "clippingParents", // evita recortes
+                });
+            });
+        });
     });
 
     onMounted(() => {
@@ -453,12 +472,13 @@
     }
 
     function toggleFullscreen() {
+        // Oculta tooltips visibles
+        document.querySelectorAll(".tooltip.show").forEach((t) => t.classList.remove("show"));
+
         if (!document.fullscreenElement) {
             graphContainer.value?.requestFullscreen();
         } else {
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            }
+            document.exitFullscreen?.();
         }
     }
 
@@ -489,145 +509,11 @@
 <template>
     <div class="container">
         <!-- Panel de Acciones -->
-        <div class="card p-3 mb-3 shadow-sm">
-            <div class="card-header bg-primary text-white">
-                <h6 class="m-0">Panel de Acciones</h6>
-            </div>
-            <div class="card-body">
-                <div class="row gx-3 gy-3 align-items-stretch p-1">
-                    <!-- Gestión de Nodos -->
-                    <div class="col-md-6 d-flex">
-                        <div class="section-info d-flex flex-column flex-fill">
-                            <!-- header centrado -->
-                            <div
-                                class="section-info__header d-flex justify-content-center align-items-center mb-1">
-                                <i class="bi bi-diagram-3-fill icon-lg me-2"></i>
-                                <h6 class="mb-0">Gestión de Nodos</h6>
-                            </div>
-                            <!-- acciones abajo, centradas -->
-                            <div
-                                class="section-info__actions d-flex justify-content-center gap-2 mt-auto">
-                                <p
-                                    class="sii-btn sii-btn-gray"
-                                    :disabled="selectedNodes.length === 0"
-                                    @click="removeNode">
-                                    <i class="fas fa-trash-alt me-1"></i>
-                                    Eliminar Nodo
-                                </p>
-                                <button class="sii-btn sii-btn-secondary" @click="openAddNodeModal">
-                                    <i class="fas fa-plus-circle me-1"></i>
-                                    Crear Nodo
-                                </button>
-                            </div>
-                        </div>
-                    </div>
 
-                    <!-- Gestión de Aristas -->
-                    <div class="col-md-6 d-flex">
-                        <div class="section-info d-flex flex-column flex-fill">
-                            <!-- header centrado -->
-                            <div
-                                class="section-info__header d-flex justify-content-center align-items-center mb-1">
-                                <i class="bi bi-link-45deg icon-lg me-2"></i>
-                                <h6 class="mb-0">Gestión de Aristas</h6>
-                            </div>
-                            <!-- acciones abajo, centradas -->
-                            <div class="section-info__actions d-flex justify-content-center gap-2">
-                                <button
-                                    class="sii-btn sii-btn-gray"
-                                    :disabled="selectedEdges.length === 0"
-                                    @click="removeEdge">
-                                    <i class="bi bi-unlink me-1"></i>
-                                    Eliminar Arista
-                                </button>
-                                <button
-                                    class="sii-btn sii-btn-secondary"
-                                    :disabled="selectedNodes.length !== 2"
-                                    @click="addEdge">
-                                    <i class="fas fa-link me-1"></i>
-                                    Crear Arista
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Checkbox para habilitar Force Layout -->
-                    <!-- <div class="col-md-6 mt-3">
-                        <div class="p-3 bg-light rounded shadow-sm">
-                            <h6 class="text-primary mb-3">
-                                <strong>Configuración de Layout</strong>
-                            </h6>
-                            <div class="form-check">
-                                <input
-                                    class="form-check-input"
-                                    type="checkbox"
-                                    v-model="d3ForceEnabled"
-                                    id="d3ForceCheck" />
-                                <label class="form-check-label" for="d3ForceCheck">
-                                    D3-Force enabled
-                                </label>
-                            </div>
-                        </div>
-                    </div> -->
-
-                    <!-- Renombrar Nodo -->
-                    <div class="col-md-6 d-flex mt-3">
-                        <div class="section-info d-flex flex-column flex-fill">
-                            <!-- header centrado -->
-                            <div class="section-info__header">
-                                <i class="bi bi-pencil icon-lg icon-lg icon-lg2"></i>
-                                <h6>Renombrar Nodo</h6>
-                            </div>
-                            <!-- acciones abajo -->
-                            <div
-                                class="section-info__actions d-flex flex-column gap-2 mt-auto w-75">
-                                <input
-                                    type="text"
-                                    v-model="newNodeName"
-                                    class="form-control form-control-sm"
-                                    placeholder="Nuevo Nombre del Nodo" />
-                                <button
-                                    class="btn btn-secondary btn-sm"
-                                    :disabled="selectedNodes.length !== 1"
-                                    @click="updateNodeName">
-                                    <i class="fas fa-edit me-1"></i>
-                                    Cambiar Nombre
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Exportar -->
-                    <!-- Exportar -->
-                    <div class="col-md-6 d-flex mt-3">
-                        <div class="section-info d-flex flex-column flex-fill">
-                            <!-- header centrado -->
-                            <div
-                                class="section-info__header d-flex justify-content-center align-items-center mb-1 me-5">
-                                <!-- Icono de exportar -->
-                                <i class="bi bi-file-earmark-arrow-down icon-lg icon-lg2 me-2"></i>
-                                <h6 class="mb-0">Exportar</h6>
-                            </div>
-                            <!-- acciones abajo, centradas -->
-                            <div
-                                class="section-info__actions d-flex justify-content-center gap-2 mt-3">
-                                <button class="sii-btn sii-btn-gray btn-sm" @click="downloadAsSvg">
-                                    <i class="bi bi-download me-1"></i>
-                                    Descargar SVG
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="text-center">
-                <button class="btn btn-success btn-sm px-3" @click="saveNodes">
-                    <i class="fas fa-save me-1"></i> Guardar Esquema
-                </button>
-            </div>
-        </div>
-
-        <div class="network-graph-container bg-light rounded shadow-sm p-3" ref="graphContainer">
+        <div
+            id="graph-container"
+            class="network-graph-container bg-light rounded shadow-sm p-3"
+            ref="graphContainer">
             <div class="d-flex justify-content-end flex-column align-items-end">
                 <div
                     class="fullscreen-wrapper"
@@ -674,56 +560,125 @@
                     </div>
                 </div>
             </div>
-
-            <!-- <div class="d-flex justify-content-between align-items-end">
-                <div
-                    class="fullscreen-wrapper"
-                    aria-label="Agrandar imagen"
-                    role="button"
-                    @click="toggleFullscreen"
-                    v-tippy="'Ver más grande'">
-
-                    <i
-                        class="bi bi-arrows-fullscreen text-white"
-                        style="font-size: 14px; cursor: pointer">
-                    </i>
-                </div>
-                <div
-                    class="fullscreen-wrapper"
-                    aria-label="Agrandar imagen"
-                    role="button"
-                    @click="toggleFullscreen"
-                    v-tippy="'Ver más grande'">
-
-                    <i
-                        class="bi bi-arrows-fullscreen text-white"
-                        style="font-size: 14px; cursor: pointer">
-                    </i>
-                </div>
-            </div>
-        -->
-            <div class="demo-control-panel">
+            <!-- Toolbar estilo Photoshop -->
+            <div
+                class="toolbar d-flex gap-2 flex-column position-absolute"
+                style="top: 10px; left: 10px; z-index: 2000">
                 <button
+                    class="btn btn-primary btn-sm"
+                    data-bs-toggle="tooltip"
+                    title="Gestión de Nodo">
+                    <i class="bi bi-diagram-3-fill fs-6"></i>
+                </button>
+                <button
+                    class="btn btn-light btn-sm"
+                    :disabled="selectedNodes.length === 0"
+                    data-bs-toggle="tooltip"
+                    title="Eliminar Nodo"
+                    @click="removeNode">
+                    <i class="bi bi-trash-fill text-black fs-6"></i>
+                </button>
+                <button
+                    class="btn btn-light btn-sm"
+                    data-bs-toggle="tooltip"
+                    title="Crear Nodo"
+                    @click="openAddNodeModal">
+                    <i class="bi bi-plus-circle-fill text-black fs-6"></i>
+                </button>
+            </div>
+            <div
+                class="toolbar d-flex gap-2 flex-column position-absolute"
+                style="top: 145px; left: 10px; z-index: 2000">
+                <button
+                    class="btn btn-primary btn-sm"
+                    data-bs-toggle="tooltip"
+                    title="Gestión de Aristas">
+                    <i class="bi bi-arrow-left-right"></i>
+                </button>
+
+                <!-- Eliminar Arista -->
+                <button
+                    class="btn btn-light btn-sm"
+                    :disabled="selectedEdges.length === 0"
+                    data-bs-toggle="tooltip"
+                    title="Eliminar Arista"
+                    @click="removeEdge">
+                    <i class="bi bi-trash3-fill text-black fs-6"></i>
+                </button>
+                <!-- Crear Arista -->
+                <button
+                    class="btn btn-light btn-sm"
+                    :disabled="selectedNodes.length !== 2"
+                    data-bs-toggle="tooltip"
+                    title="Crear Arista"
+                    @click="addEdge">
+                    <i class="bi bi-plus-circle-fill text-black fs-6"></i>
+                </button>
+            </div>
+
+            <div
+                class="toolbar d-flex gap-2 flex-column position-absolute"
+                style="top: 280px; left: 10px; z-index: 2000">
+                <button
+                    class="btn btn-primary btn-sm"
+                    data-bs-toggle="tooltip"
+                    title="Gestión de Grupos">
+                    <i class="bi bi-share-fill fs-6"></i>
+                </button>
+                <button
+                    class="btn btn-light btn-sm"
                     @click="stopBoxSelection"
-                    class="sii-btn sii-btn-gray btn-sm"
-                    :disabled="!isBoxSelectionMode">
-                    Detener selección
+                    :disabled="!isBoxSelectionMode"
+                    data-bs-toggle="tooltip"
+                    title="Detener selección">
+                    <i
+                        :class="[
+                            'bi',
+                            'bi-stop-circle',
+                            'fs-6',
+                            isBoxSelectionMode ? 'text-danger' : 'text-black',
+                        ]"></i>
                 </button>
-
-                <button
-                    @click="startBoxSelection"
-                    class="sii-btn sii-btn-secondary"
-                    :disabled="isBoxSelectionMode"
-                    aria-pressed="isBoxSelectionMode">
-                    Selección por Caja
-                </button>
-                <!-- Componente: Exportar a Excel -->
-                <ExcelExportButton
-                    :isBoxMode="isBoxSelectionMode"
-                    :selectedNodes="selectedNodes"
-                    :nodes="nodes"
-                    :layouts="layouts.nodes" />
             </div>
+            <!-- Selección por Grupo de Nodo -->
+            <div
+                class="toolbar d-flex gap-2 flex-column position-absolute"
+                style="top: 358px; left: 10px; z-index: 2000">
+                <div class="d-flex justify-content-end">
+                    <button
+                        class="btn btn-light btn-sm"
+                        @click="startBoxSelection"
+                        :disabled="isBoxSelectionMode"
+                        aria-pressed="isBoxSelectionMode"
+                        data-bs-toggle="tooltip"
+                        title="Selección por Grupo de Nodos">
+                        <i class="bi bi-check-circle fs-6"></i>
+                    </button>
+                    <div>
+                        <ExcelExportButton
+                            class="btn btn-light btn-sm demos"
+                            :isBoxMode="isBoxSelectionMode"
+                            :selectedNodes="selectedNodes"
+                            :nodes="nodes"
+                            :layouts="layouts.nodes"
+                            data-bs-toggle="tooltip"
+                            title="Exportar a Excel" />
+                    </div>
+                </div>
+            </div>
+            <!-- Descargar SVG -->
+            <div
+                class="toolbar d-flex gap-2 flex-column position-absolute"
+                style="top: 420px; left: 10px; z-index: 2000">
+                <button
+                    class="btn btn-light btn-sm"
+                    data-bs-toggle="tooltip"
+                    title="Descargar SVG"
+                    @click="downloadAsSvg">
+                    <i class="bi bi-file-earmark-arrow-down text-primary fs-6"></i>
+                </button>
+            </div>
+
             <v-network-graph
                 :selected-nodes="selectedNodes"
                 @update:selected-nodes="onSelectedNodesUpdate"
@@ -933,7 +888,7 @@
         background-color: #ffffff;
         padding: 20px;
         position: relative;
-        overflow: auto; /* <— permite scroll si los nodos se salen */
+        overflow: visible; /* <— permite scroll si los nodos se salen */
     }
 
     /* Estilos para el contenedor del ícono de fullscreen */
@@ -1150,5 +1105,21 @@
 
     .icon-lg2 {
         font-size: 3rem;
+    }
+
+    .toolbar {
+        background: rgba(255, 255, 255, 0.8);
+        padding: 4px;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap; /* Permite que los botones salten de línea si no caben */
+        max-width: calc(100% - 20px); /* Evita que exceda el ancho del contenedor */
+        overflow: hidden; /* Oculta cualquier desborde */
+    }
+
+    .network-graph-container {
+        overflow: visible; /* Permite ver tooltips o elementos flotantes fuera del scroll */
     }
 </style>
