@@ -83,7 +83,7 @@
 <template>
     <button
         v-if="isBoxMode"
-        class="sii-btn sii-btn-primary btn-sm"
+        class="sii-btn sii-btn-secondary btn-sm"
         @click="exportToExcel"
         :disabled="!isBoxMode">
         Exportar a Excel

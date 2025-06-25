@@ -7,6 +7,7 @@
 
     import data from "../data";
     import ExcelExportButton from "../components/ExcelExportButton.vue";
+    import Swal from "sweetalert2";
 
     // Asegúrate de tener v-network-graph instalado: npm install v-network-graph
     // Asegúrate de tener Bootstrap CSS/JS en tu index.html o main.js
@@ -22,6 +23,12 @@
     const newNodeName = ref<string>("");
     const graph = ref<vNG.Instance | null>(null);
     const graphContainer = ref<HTMLDivElement | null>(null);
+    // ref al botón
+    const deleteBtn = ref<HTMLButtonElement | null>(null);
+
+    // referenciar botones
+    const deleteEdgeBtn = ref<HTMLButtonElement | null>(null);
+    const createEdgeBtn = ref<HTMLButtonElement | null>(null);
 
     // box-selection
     const isBoxSelectionMode = ref(false);
@@ -386,6 +393,265 @@
         selectedNodes.value = [];
     }
 
+    function handleRemoveNode() {
+        const btn = deleteBtn.value;
+
+        // 1) Ocultar el tooltip de Bootstrap (botón)
+        if (btn) {
+            const tipInst = Tooltip.getInstance(btn);
+            if (tipInst) {
+                tipInst.hide();
+            }
+            btn.blur();
+        }
+
+        // 2) Validación de selección
+        if (selectedNodes.value.length === 0) {
+            return Swal.fire({
+                target: "#graph-container",
+                icon: "warning",
+                title: "Atención",
+                text: "Para eliminar un nodo primero debe seleccionarlo",
+                iconColor: "#FF4F4F",
+                background: "#FFFFFF",
+                customClass: {
+                    popup: "sii-swal-popup",
+                    header: "sii-swal-header-error",
+                    //title: "sii-swal-title",
+                    icon: "sii-swal-icon",
+                    confirmButton: "sii-swal-confirm-btn",
+                    closeButton: "sii-swal-close-btn",
+                } as any,
+                confirmButtonText: "Entendido",
+            });
+        }
+
+        // 3) Confirmación de borrado
+        Swal.fire({
+            target: "#graph-container",
+            title: "¿Estás seguro?",
+            text: "Se eliminará el nodo seleccionado.",
+            icon: "warning",
+            iconColor: "#FF4F4F",
+            background: "#FFFFFF",
+            showCancelButton: true,
+            reverseButtons: true,
+            cancelButtonText: "Cancelar",
+            confirmButtonText: "Sí, eliminar",
+            customClass: {
+                popup: "sii-swal-popup",
+                header: "sii-swal-header-error",
+                //title: "sii-swal-title",
+                icon: "sii-swal-icon",
+                confirmButton: "sii-swal-confirm-btn",
+                cancelButton: "sii-swal-cancel-btn",
+                closeButton: "sii-swal-close-btn",
+            } as any,
+        }).then((result) => {
+            if (!result.isConfirmed) return;
+
+            // 4) Ocultar tooltip persistente de VNG
+            tooltipOpacity.value = 0;
+            targetNodeId.value = "";
+
+            // 5) Eliminar el nodo
+            removeNode();
+
+            // 6) Asegurar que el tooltip de Bootstrap esté oculto y sin focus
+            if (btn) {
+                const tipInst2 = Tooltip.getInstance(btn);
+                if (tipInst2) {
+                    tipInst2.hide();
+                }
+                btn.blur();
+            }
+
+            // 7) Mensaje de éxito
+            Swal.fire({
+                target: "#graph-container",
+                icon: "success",
+                title: "¡Eliminado!",
+                text: "El nodo ha sido eliminado.",
+                iconColor: "#20c997",
+                background: "#FFFFFF",
+                customClass: {
+                    popup: "sii-swal-popup",
+                    header: "sii-swal-header-info",
+                    //title: "sii-swal-title",
+                    icon: "sii-swal-icon",
+                    confirmButton: "sii-swal-confirm-btn",
+                    closeButton: "sii-swal-close-btn",
+                } as any,
+                confirmButtonText: "Cerrar",
+            });
+        });
+    }
+
+    function handleRemoveEdge() {
+        const btn = deleteEdgeBtn.value;
+        // 1) Ocultar tooltip Bootstrap
+        if (btn) {
+            const inst = Tooltip.getInstance(btn);
+            if (inst) inst.hide();
+            btn.blur();
+        }
+
+        // 2) Validación
+        if (selectedEdges.value.length === 0) {
+            return Swal.fire({
+                target: "#graph-container",
+                icon: "warning",
+                title: "Atención",
+                text: "Para eliminar una arista primero debe seleccionarla",
+                iconColor: "#FF4F4F",
+                background: "#FFFFFF",
+                customClass: {
+                    popup: "sii-swal-popup",
+                    header: "sii-swal-header-error",
+                    //title: "sii-swal-title",
+                    icon: "sii-swal-icon",
+                    confirmButton: "sii-swal-confirm-btn",
+                    closeButton: "sii-swal-close-btn",
+                } as any,
+                confirmButtonText: "Entendido",
+            });
+        }
+
+        // 3) Confirmación
+        Swal.fire({
+            target: "#graph-container",
+            title: "¿Eliminar arista?",
+            text: "Se eliminará la(s) arista(s) seleccionada(s).",
+            icon: "warning",
+            iconColor: "#FF4F4F",
+            background: "#FFFFFF",
+            showCancelButton: true,
+            reverseButtons: true,
+            cancelButtonText: "Cancelar",
+            confirmButtonText: "Sí, eliminar",
+            customClass: {
+                popup: "sii-swal-popup",
+                header: "sii-swal-header-error",
+                //title: "sii-swal-title",
+                icon: "sii-swal-icon",
+                confirmButton: "sii-swal-confirm-btn",
+                cancelButton: "sii-swal-cancel-btn",
+                closeButton: "sii-swal-close-btn",
+            } as any,
+        }).then((r) => {
+            if (!r.isConfirmed) return;
+
+            // ocultar tooltips VNG
+            edgeTooltipOpacity.value = 0;
+            targetEdgeId.value = "";
+            // eliminar arista
+            removeEdge();
+            // ocultar de nuevo el tooltip Bootstrap
+            if (btn) {
+                const inst2 = Tooltip.getInstance(btn);
+                if (inst2) inst2.hide();
+                btn.blur();
+            }
+            // mensaje éxito
+            Swal.fire({
+                target: "#graph-container",
+                icon: "success",
+                title: "¡Arista eliminada!",
+                text: "La arista ha sido eliminada.",
+                iconColor: "#20c997",
+                background: "#FFFFFF",
+                customClass: {
+                    popup: "sii-swal-popup",
+                    header: "sii-swal-header-info",
+                    //title: "sii-swal-title",
+                    icon: "sii-swal-icon",
+                    confirmButton: "sii-swal-confirm-btn",
+                    closeButton: "sii-swal-close-btn",
+                } as any,
+                confirmButtonText: "Cerrar",
+            });
+        });
+    }
+
+    function handleCreateEdge() {
+        const btn = createEdgeBtn.value;
+        if (btn) {
+            const inst = Tooltip.getInstance(btn);
+            if (inst) inst.hide();
+            btn.blur();
+        }
+
+        // Si no hay exactamente dos nodos seleccionados, advertimos sobre SHIFT+clic
+        if (selectedNodes.value.length !== 2) {
+            return Swal.fire({
+                target: "#graph-container",
+                icon: "info",
+                title: "Modo creación",
+                text: "Para crear una arista mantén presionada la tecla Shift mientras haces clic en dos nodos (primero uno, luego otro).",
+                iconColor: "#0F69B4",
+                background: "#FFFFFF",
+                customClass: {
+                    popup: "sii-swal-popup",
+                    header: "sii-swal-header-info",
+                    icon: "sii-swal-icon",
+                    confirmButton: "sii-swal-confirm-btn",
+                    closeButton: "sii-swal-close-btn",
+                } as any,
+                confirmButtonText: "Entendido",
+            });
+        }
+
+        // Si llegamos aquí, ya hay dos nodos seleccionados: pedimos confirmación
+        const [src, tgt] = selectedNodes.value;
+        Swal.fire({
+            target: "#graph-container",
+            title: " ¿Crear arista entre?",
+            html: `
+    <span class="sii-swal-text">
+
+      <span class="sii-node-name">${nodes[src].name}</span>
+      y
+      <span class="sii-node-name">${nodes[tgt].name}</span>
+    </span>
+  `,
+            icon: "question",
+            iconColor: "#0F69B4",
+            background: "#FFFFFF",
+            showCancelButton: true,
+            reverseButtons: true,
+            confirmButtonText: "Crear",
+            cancelButtonText: "Cancelar",
+            customClass: {
+                popup: "sii-swal-popup",
+                header: "sii-swal-header-info",
+                icon: "sii-swal-icon",
+                title: "sii-swal-tamanio-letra",
+                confirmButton: "sii-swal-confirm-btn",
+                cancelButton: "sii-swal-cancel-btn",
+                closeButton: "sii-swal-close-btn",
+            } as any,
+        }).then((r) => {
+            if (!r.isConfirmed) return;
+            addEdge();
+            Swal.fire({
+                target: "#graph-container",
+                icon: "success",
+                title: "¡Arista creada!",
+                text: "La arista ha sido creada exitosamente.",
+                iconColor: "#20c997",
+                background: "#FFFFFF",
+                customClass: {
+                    popup: "sii-swal-popup",
+                    header: "sii-swal-header-info",
+                    icon: "sii-swal-icon",
+                    confirmButton: "sii-swal-confirm-btn",
+                    closeButton: "sii-swal-close-btn",
+                } as any,
+                confirmButtonText: "Cerrar",
+            });
+        });
+    }
+
     function addEdge() {
         if (selectedNodes.value.length !== 2) {
             alert("Por favor selecciona exactamente dos nodos para crear una arista.");
@@ -571,13 +837,14 @@
                     <i class="bi bi-diagram-3-fill fs-6"></i>
                 </button>
                 <button
+                    ref="deleteBtn"
                     class="btn btn-light btn-sm"
-                    :disabled="selectedNodes.length === 0"
                     data-bs-toggle="tooltip"
                     title="Eliminar Nodo"
-                    @click="removeNode">
+                    @click="handleRemoveNode">
                     <i class="bi bi-trash-fill text-black fs-6"></i>
                 </button>
+
                 <button
                     class="btn btn-light btn-sm"
                     data-bs-toggle="tooltip"
@@ -598,20 +865,20 @@
 
                 <!-- Eliminar Arista -->
                 <button
+                    ref="deleteEdgeBtn"
                     class="btn btn-light btn-sm"
-                    :disabled="selectedEdges.length === 0"
                     data-bs-toggle="tooltip"
                     title="Eliminar Arista"
-                    @click="removeEdge">
+                    @click="handleRemoveEdge">
                     <i class="bi bi-trash3-fill text-black fs-6"></i>
                 </button>
                 <!-- Crear Arista -->
                 <button
+                    ref="createEdgeBtn"
                     class="btn btn-light btn-sm"
-                    :disabled="selectedNodes.length !== 2"
                     data-bs-toggle="tooltip"
-                    title="Crear Arista"
-                    @click="addEdge">
+                    title="Crear Arista "
+                    @click="handleCreateEdge">
                     <i class="bi bi-plus-circle-fill text-black fs-6"></i>
                 </button>
             </div>
@@ -649,11 +916,12 @@
                         class="btn btn-light btn-sm"
                         @click="startBoxSelection"
                         :disabled="isBoxSelectionMode"
-                        aria-pressed="isBoxSelectionMode"
+                        :aria-pressed="isBoxSelectionMode ? 'true' : 'false'"
                         data-bs-toggle="tooltip"
                         title="Selección por Grupo de Nodos">
                         <i class="bi bi-check-circle fs-6"></i>
                     </button>
+
                     <div>
                         <ExcelExportButton
                             class="btn btn-light btn-sm demos"
@@ -814,7 +1082,7 @@
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 id="addNodeModalLabel" class="modal-title">
-                            <i class="bi bi-plus-circle text-warning"></i> Crear Nodo Hijo
+                            <i class="bi bi-plus-circle text-warning"></i> Crear Nodo
                         </h5>
                         <button
                             type="button"
@@ -1055,7 +1323,7 @@
         bottom: 10px;
         left: 10px;
         padding: 4px 10px;
-        background-color: #0064a0;
+        background-color: #ec540c;
         color: #ffffff;
         font-style: italic;
         border-radius: 4px;

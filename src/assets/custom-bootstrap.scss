@@ -100,6 +100,7 @@ $dark: $gris-texto-iconos !default;
 
 .sii-btn-secondary:hover:not(:disabled) {
     background-color: darken($azul-marca, 10%);
+    color: #ffffff;
 }
 
 /* Botón neutro/inactivo: Gris claro (light) */
@@ -197,4 +198,83 @@ $dark: $gris-texto-iconos !default;
 .tooltip.bs-tooltip-start .tooltip-arrow::before,
 .tooltip.bs-tooltip-end .tooltip-arrow::before {
     border-color: #ec540c;
+}
+
+
+/* global.css */
+/* Popup blanco con sombra */
+.sii-swal-popup {
+    background: #FFFFFF !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+    font-family: Arial, sans-serif;
+}
+
+/* Franja superior de la alerta */
+.sii-swal-header-error {
+    background-color: #FF4F4F !important;
+    /* rojo alerta */
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    padding: 12px;
+}
+
+.sii-swal-header-info {
+    background-color: #0F69B4 !important;
+    /* azul info */
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    padding: 12px;
+}
+
+/* Título en Arial Regular, mayúscula para error, mixto para info */
+.sii-swal-title {
+    margin: 0;
+    color: #FFFFFF !important;
+    font-size: 18px !important;
+    font-weight: normal !important;
+    text-transform: uppercase;
+    /* Error e Información según guías :contentReference[oaicite:2]{index=2} */
+}
+
+/* Icono del sweetalert2 */
+.sii-swal-icon>.swal2-icon {
+    font-size: 40px !important;
+    color: inherit !important;
+    /* tomará el iconColor definido */
+}
+
+/* Botón de confirmación */
+.sii-swal-confirm-btn {
+    background-color: #0064A0 !important;
+    /* color primario SII :contentReference[oaicite:3]{index=3} */
+    color: #FFFFFF !important;
+    border: none !important;
+    font-size: 14px !important;
+    padding: 8px 16px !important;
+}
+
+/* Botón de cancelacion */
+.sii-swal-cancel-btn {
+    background-color: #6e7881 !important;
+    /* color primario SII :contentReference[oaicite:3]{index=3} */
+    color: #FFFFFF !important;
+    border: none !important;
+    font-size: 14px !important;
+    padding: 8px 16px !important;
+}
+
+/* Botón de cierre (la “X” en la esquina) */
+.sii-swal-close-btn {
+    color: #0c0c0c !important;
+    font-size: 20px !important;
+}
+
+// .sii-swal-tamanio-letra {
+//     font-size: 14px !important;
+
+// }
+
+.sii-node-name {
+    color: $naranjo_marca;
+    font-weight: bold;
 }
