@@ -706,15 +706,75 @@
         }
     );
 
+    // function saveNodes() {
+    //     const currentGraphState = {
+    //         nodes: { ...nodes },
+    //         edges: { ...edges },
+    //         nextNodeIndex: nextNodeIndex.value,
+    //         nextEdgeIndex: nextEdgeIndex.value,
+    //     };
+    //     localStorage.setItem("savedGraphState", JSON.stringify(currentGraphState));
+    //     alert("Nodos y aristas guardados correctamente.");
+    // }
+
+    // function loadNodes() {
+    //     const savedGraphState = localStorage.getItem("savedGraphState");
+    //     if (savedGraphState) {
+    //         const {
+    //             nodes: savedNodes,
+    //             edges: savedEdges,
+    //             nextNodeIndex: savedNodeIndex,
+    //             nextEdgeIndex: savedEdgeIndex,
+    //         } = JSON.parse(savedGraphState);
+    //         for (const nodeId in savedNodes) {
+    //             nodes[nodeId] = { ...nodes[nodeId], ...savedNodes[nodeId] };
+    //         }
+    //         for (const edgeId in savedEdges) {
+    //             edges[edgeId] = { ...edges[edgeId], ...savedEdges[edgeId] };
+    //         }
+    //         nextNodeIndex.value = savedNodeIndex;
+    //         nextEdgeIndex.value = savedEdgeIndex;
+    //     }
+    // }
+
     function saveNodes() {
+        const cleanNodes = {};
+        for (const k in nodes) {
+            if (nodes[k]) cleanNodes[k] = nodes[k];
+        }
+        const cleanEdges = {};
+        for (const k in edges) {
+            if (edges[k]) cleanEdges[k] = edges[k];
+        }
         const currentGraphState = {
-            nodes: { ...nodes },
-            edges: { ...edges },
+            nodes: cleanNodes,
+            edges: cleanEdges,
             nextNodeIndex: nextNodeIndex.value,
             nextEdgeIndex: nextEdgeIndex.value,
         };
         localStorage.setItem("savedGraphState", JSON.stringify(currentGraphState));
-        alert("Nodos y aristas guardados correctamente.");
+
+        // Muestra el mensaje con SweetAlert2
+        Swal.fire({
+            target: "#graph-container",
+            icon: "success",
+            title: "¡Esquema guardado!",
+            text: "Nodos y aristas guardados correctamente.",
+            iconColor: "#20c997",
+            background: "#FFFFFF",
+            showConfirmButton: false,
+            timer: 1200,
+            timerProgressBar: true,
+            //position: "bottom-end", // Esquina inferior derecha del container
+            customClass: {
+                popup: "sii-swal-popup",
+                header: "sii-swal-header-info",
+                icon: "sii-swal-icon",
+                title: "sii-swal-title",
+                confirmButton: "sii-swal-confirm-btn",
+                closeButton: "sii-swal-close-btn",
+            } as any,
+        });
     }
 
     function loadNodes() {
@@ -726,12 +786,19 @@
                 nextNodeIndex: savedNodeIndex,
                 nextEdgeIndex: savedEdgeIndex,
             } = JSON.parse(savedGraphState);
+
+            // Limpia todos los nodos y edges existentes antes de cargar los nuevos
+            Object.keys(nodes).forEach((k) => delete nodes[k]);
+            Object.keys(edges).forEach((k) => delete edges[k]);
+
+            // Carga los nuevos nodos y edges
             for (const nodeId in savedNodes) {
-                nodes[nodeId] = { ...nodes[nodeId], ...savedNodes[nodeId] };
+                nodes[nodeId] = { ...savedNodes[nodeId] };
             }
             for (const edgeId in savedEdges) {
-                edges[edgeId] = { ...edges[edgeId], ...savedEdges[edgeId] };
+                edges[edgeId] = { ...savedEdges[edgeId] };
             }
+
             nextNodeIndex.value = savedNodeIndex;
             nextEdgeIndex.value = savedEdgeIndex;
         }
@@ -946,6 +1013,10 @@
                     <i class="bi bi-file-earmark-arrow-down text-primary fs-6"></i>
                 </button>
             </div>
+            <!-- Botón fijo en esquina inferior derecha dentro del grafo -->
+            <button class="btn btn-success btn-sm px-3 save-btn-bottom-right" @click="saveNodes">
+                <i class="fas fa-save me-1"></i> Guardar Esquema
+            </button>
 
             <v-network-graph
                 :selected-nodes="selectedNodes"
@@ -1389,5 +1460,16 @@
 
     .network-graph-container {
         overflow: visible; /* Permite ver tooltips o elementos flotantes fuera del scroll */
+    }
+
+    .save-btn-bottom-right {
+        position: absolute;
+        bottom: 22px; /* Espacio desde el borde inferior */
+        right: 22px; /* Espacio desde el borde derecho */
+        z-index: 3000; /* Por encima del grafo y toolbars */
+        border-radius: 8px;
+        box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.09);
+        font-weight: bold;
+        padding: 8px;
     }
 </style>
