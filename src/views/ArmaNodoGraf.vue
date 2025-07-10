@@ -40,18 +40,58 @@
         showEditNodeModal.value = true;
     }
 
-    // --- Método para confirmar edición ---
+    // ...
+
     function handleConfirmEditNode(data: any) {
-        const nodeId = data.nodeId;
-        if (nodes[nodeId] && nodes[nodeId].data) {
-            nodes[nodeId].name = data.nombre;
-            nodes[nodeId].data.rut = data.rut ?? "";
-            nodes[nodeId].data.tipo = data.tipo ?? "";
-            nodes[nodeId].data.capitalEnterado = data.capitalEnterado ?? 0;
-            nodes[nodeId].data.lineaNegocio = data.lineaNegocio ?? "";
-            showEditNodeModal.value = false;
-            closeTooltip("node");
-        }
+        // Cierra el modal de edición antes de mostrar la alerta
+        showEditNodeModal.value = false;
+        nextTick(() => {
+            Swal.fire({
+                title: "¿Está seguro de editar este nodo?",
+                text: "Se actualizarán los datos del nodo seleccionado.",
+                icon: "warning",
+                showCancelButton: true,
+                confirmButtonText: "Sí, guardar cambios",
+                cancelButtonText: "Cancelar",
+                reverseButtons: true,
+                customClass: {
+                    popup: "sii-swal-popup",
+                    header: "sii-swal-header-info",
+                    icon: "sii-swal-icon",
+                    confirmButton: "sii-swal-confirm-btn",
+                    cancelButton: "sii-swal-cancel-btn",
+                    closeButton: "sii-swal-close-btn",
+                } as any,
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const nodeId = data.nodeId;
+                    if (nodes[nodeId] && nodes[nodeId].data) {
+                        nodes[nodeId].name = data.nombre;
+                        nodes[nodeId].data.rut = data.rut ?? "";
+                        nodes[nodeId].data.tipo = data.tipo ?? "";
+                        nodes[nodeId].data.capitalEnterado = data.capitalEnterado ?? 0;
+                        nodes[nodeId].data.lineaNegocio = data.lineaNegocio ?? "";
+                        closeTooltip("node");
+                        // Mensaje de éxito
+                        Swal.fire({
+                            icon: "success",
+                            title: "¡Nodo actualizado!",
+                            text: "El nodo ha sido editado correctamente.",
+                            iconColor: "#20c997",
+                            background: "#FFFFFF",
+                            confirmButtonText: "Cerrar",
+                            customClass: {
+                                popup: "sii-swal-popup",
+                                header: "sii-swal-header-info",
+                                icon: "sii-swal-icon",
+                                confirmButton: "sii-swal-confirm-btn",
+                                closeButton: "sii-swal-close-btn",
+                            } as any,
+                        });
+                    }
+                }
+            });
+        });
     }
 
     // --- 3. Graph refs y estado base ---
@@ -424,77 +464,74 @@
                 confirmButtonText: "Entendido",
             });
         }
-        const [src, tgt] = selectedNodes.value;
-        Swal.fire({
-            target: "#graph-container",
-            title: " ¿Crear arista entre?",
-            html: `
-      <span class="sii-swal-text">
-        <span class="sii-node-name">${nodes[src].name}</span>
-        y
-        <span class="sii-node-name">${nodes[tgt].name}</span>
-      </span>
-    `,
-            icon: "question",
-            iconColor: "#0F69B4",
-            background: "#FFFFFF",
-            showCancelButton: true,
-            reverseButtons: true,
-            confirmButtonText: "Crear",
-            cancelButtonText: "Cancelar",
-            customClass: {
-                popup: "sii-swal-popup",
-                header: "sii-swal-header-info",
-                icon: "sii-swal-icon",
-                title: "sii-swal-tamanio-letra",
-                confirmButton: "sii-swal-confirm-btn",
-                cancelButton: "sii-swal-cancel-btn",
-                closeButton: "sii-swal-close-btn",
-            } as any,
-        }).then((r) => {
-            if (!r.isConfirmed) return;
-            addEdge();
-            Swal.fire({
-                target: "#graph-container",
-                icon: "success",
-                title: "¡Arista creada!",
-                text: "La arista ha sido creada exitosamente.",
-                iconColor: "#20c997",
-                background: "#FFFFFF",
-                customClass: {
-                    popup: "sii-swal-popup",
-                    header: "sii-swal-header-info",
-                    icon: "sii-swal-icon",
-                    confirmButton: "sii-swal-confirm-btn",
-                    closeButton: "sii-swal-close-btn",
-                } as any,
-                confirmButtonText: "Cerrar",
-            });
-        });
+        // Llama directo a addEdge (solo si hay 2 nodos seleccionados)
+        addEdge();
     }
+
     function addEdge() {
         if (selectedNodes.value.length !== 2) {
-            alert("Por favor selecciona exactamente dos nodos para crear una arista.");
+            // Esto nunca debería entrar porque ya validaste arriba
             return;
         }
         const [source, target] = selectedNodes.value;
-        const edgeId = `edge${nextEdgeIndex.value}`;
-        const edgeColor = "#002C48";
-        const porcentajeParticipacion = parseFloat(
-            prompt("Ingrese el porcentaje de participación:", "0") || "0"
-        );
-        const porcentajeParticipacionUtilidades = parseFloat(
-            prompt("Ingrese el porcentaje de participación en utilidades:", "0") || "0"
-        );
-        edges[edgeId] = {
-            source,
-            target,
-            color: edgeColor,
-            porcentajeParticipacion,
-            porcentajeParticipacionUtilidades,
-        };
-        nextEdgeIndex.value++;
+
+        // Primer SweetAlert: porcentaje de participación
+        Swal.fire({
+            title: "Porcentaje de Participación",
+            input: "number",
+            inputLabel: "Ingrese el porcentaje de participación:",
+            inputValue: 0,
+            inputAttributes: {
+                min: "0",
+                max: "100",
+                step: "0.01",
+            },
+            showCancelButton: true,
+            confirmButtonText: "Siguiente",
+            cancelButtonText: "Cancelar",
+        }).then((result) => {
+            if (!result.isConfirmed) return;
+            const porcentajeParticipacion = parseFloat(result.value || "0");
+
+            // Segundo SweetAlert: porcentaje de utilidades
+            Swal.fire({
+                title: "Porcentaje de Utilidades",
+                input: "number",
+                inputLabel: "Ingrese el porcentaje de participación en utilidades:",
+                inputValue: 0,
+                inputAttributes: {
+                    min: "0",
+                    max: "100",
+                    step: "0.01",
+                },
+                showCancelButton: true,
+                confirmButtonText: "Crear",
+                cancelButtonText: "Cancelar",
+            }).then((result2) => {
+                if (!result2.isConfirmed) return;
+                const porcentajeParticipacionUtilidades = parseFloat(result2.value || "0");
+                const edgeId = `edge${nextEdgeIndex.value}`;
+                const edgeColor = "#002C48";
+                edges[edgeId] = {
+                    source,
+                    target,
+                    color: edgeColor,
+                    porcentajeParticipacion,
+                    porcentajeParticipacionUtilidades,
+                };
+                nextEdgeIndex.value++;
+                Swal.fire({
+                    icon: "success",
+                    title: "¡Arista creada!",
+                    text: "La arista ha sido creada exitosamente.",
+                    iconColor: "#20c997",
+                    background: "#FFFFFF",
+                    confirmButtonText: "Cerrar",
+                });
+            });
+        });
     }
+
     function removeEdge() {
         for (const edgeId of selectedEdges.value) {
             delete edges[edgeId];
@@ -1193,5 +1230,9 @@
         box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.09);
         font-weight: bold;
         padding: 8px;
+    }
+
+    .swal2-container {
+        z-index: 99999 !important;
     }
 </style>
