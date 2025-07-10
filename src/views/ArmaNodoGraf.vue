@@ -1,75 +1,140 @@
 <script setup lang="ts">
-    import { reactive, ref, onMounted, computed, watchEffect, watch, nextTick } from "vue";
+    // --- 1. Imports principales ---
+    import { reactive, ref, onMounted, watch, watchEffect, nextTick } from "vue";
     import * as vNG from "v-network-graph";
-    import { defineConfigs, EventHandlers } from "v-network-graph";
-    import { ForceLayout } from "v-network-graph/lib/force-layout";
     import { Tooltip } from "bootstrap";
-
-    import data from "../data";
-    import ExcelExportButton from "../components/ExcelExportButton.vue";
     import Swal from "sweetalert2";
+    import ExcelExportButton from "../components/ExcelExportButton.vue";
 
-    // Asegúrate de tener v-network-graph instalado: npm install v-network-graph
-    // Asegúrate de tener Bootstrap CSS/JS en tu index.html o main.js
+    // --- 2. Modularización de composables --- 🔄
+    import { useGraphState } from "../composables/useGraphState";
+    import { useGraphConfigs } from "../composables/useGraphConfigs";
+    import { useGraphTooltips } from "../composables/useGraphTooltips";
 
-    const nodes = reactive({ ...data.nodes });
-    const edges = reactive({ ...data.edges });
-    const layouts = reactive(data.layouts);
+    //--- Componentes -----//
+    import NodeModal from "../components/NodeModal.vue";
+    import EditNodeModal from "../components/EditNodeModal.vue";
 
-    const nextNodeIndex = ref(Object.keys(nodes).length + 1);
-    const nextEdgeIndex = ref(Object.keys(edges).length + 1);
-    const selectedNodes = ref<string[]>([]);
-    const selectedEdges = ref<string[]>([]);
-    const newNodeName = ref<string>("");
+    // --- Estados para edición de nodo ---
+    const showEditNodeModal = ref(false);
+    const editNodeData = reactive({
+        nodeId: "",
+        nombre: "",
+        rut: "",
+        tipo: "",
+        capitalEnterado: 0,
+        lineaNegocio: "",
+    });
+
+    // --- Método para abrir modal de edición ---
+    function openEditNodeModal(tooltipData) {
+        console.log("Abriendo modal para editar:", tooltipData);
+        Object.assign(editNodeData, {
+            nodeId: tooltipData.id,
+            nombre: tooltipData.name ?? "",
+            rut: tooltipData.data?.rut ?? "",
+            tipo: tooltipData.data?.tipo ?? "",
+            capitalEnterado: tooltipData.data?.capitalEnterado ?? 0,
+            lineaNegocio: tooltipData.data?.lineaNegocio ?? "",
+        });
+        showEditNodeModal.value = true;
+    }
+
+    // --- Método para confirmar edición ---
+    function handleConfirmEditNode(data: any) {
+        const nodeId = data.nodeId;
+        if (nodes[nodeId] && nodes[nodeId].data) {
+            nodes[nodeId].name = data.nombre;
+            nodes[nodeId].data.rut = data.rut ?? "";
+            nodes[nodeId].data.tipo = data.tipo ?? "";
+            nodes[nodeId].data.capitalEnterado = data.capitalEnterado ?? 0;
+            nodes[nodeId].data.lineaNegocio = data.lineaNegocio ?? "";
+            showEditNodeModal.value = false;
+            closeTooltip("node");
+        }
+    }
+
+    // --- 3. Graph refs y estado base ---
     const graph = ref<vNG.Instance | null>(null);
     const graphContainer = ref<HTMLDivElement | null>(null);
-    // ref al botón
     const deleteBtn = ref<HTMLButtonElement | null>(null);
-
-    // referenciar botones
     const deleteEdgeBtn = ref<HTMLButtonElement | null>(null);
     const createEdgeBtn = ref<HTMLButtonElement | null>(null);
 
-    // box-selection
+    const showAddNodeModal = ref(false);
+
+    function openAddNodeModal() {
+        showAddNodeModal.value = true;
+    }
+    function handleConfirmAddNode(data) {
+        addNode(data.nombre, data.rut, data.tipo, data.capitalEnterado, data.lineaNegocio);
+        showAddNodeModal.value = false;
+    }
+
+    // --- 4. Estados del grafo (nodos, aristas, layouts, selección, etc.) ---
+    const {
+        nodes,
+        edges,
+        layouts,
+        nextNodeIndex,
+        nextEdgeIndex,
+        selectedNodes,
+        selectedEdges,
+        newNodeName,
+    } = useGraphState();
+
+    const { configs, d3ForceEnabled, onNodeMoved } = useGraphConfigs();
+    const {
+        tooltip,
+        tooltipData,
+        tooltipOpacity,
+        tooltipPos,
+        targetNodeId,
+        showNodeTooltip,
+        edgeTooltip,
+        edgeTooltipData,
+        edgeTooltipOpacity,
+        edgeTooltipPos,
+        targetEdgeId,
+        showEdgeTooltip,
+        closeTooltip,
+    } = useGraphTooltips(graph, layouts);
+
+    // --- 5. Selección por caja ---
     const isBoxSelectionMode = ref(false);
-
-    // 3) Lista de tooltips para la selección
     const selectionTooltips = ref<Array<{ id: string; left: string; top: string; data: any }>>([]);
-
-    // 4) Gap vertical
     const verticalGap = 8;
 
-    // 5) Función para recomputar tooltips de selección
     function updateSelectionTooltips() {
         if (!graph.value) {
             selectionTooltips.value = [];
             return;
         }
-        selectionTooltips.value = selectedNodes.value.map((id) => {
-            const nodeData = nodes[id];
-            const layout = layouts.nodes[id];
-            const dom = graph.value!.translateFromSvgToDomCoordinates(layout);
-            return {
-                id,
-                data: {
-                    name: nodeData.name,
-                    ...nodeData.data, // rut, tipo, capitalEnterado, lineaNegocio
-                    x: layout.x.toFixed(2),
-                    y: layout.y.toFixed(2),
-                },
-                left: `${dom.x - 75}px`,
-                top: `${dom.y - 50 - verticalGap}px`,
-            };
-        });
+        selectionTooltips.value = selectedNodes.value
+            .map((id) => {
+                const nodeData = nodes[id];
+                const layout = layouts.nodes[id];
+                if (!nodeData || !layout) return { id, data: {}, left: "0px", top: "0px" };
+                const dom = graph.value!.translateFromSvgToDomCoordinates(layout);
+                return {
+                    id,
+                    data: {
+                        name: nodeData.name,
+                        ...(nodeData.data ?? {}),
+                        x: layout.x?.toFixed(2) ?? "",
+                        y: layout.y?.toFixed(2) ?? "",
+                    },
+                    left: `${dom.x - 75}px`,
+                    top: `${dom.y - 50 - verticalGap}px`,
+                };
+            })
+            .filter((tip) => tip.id);
     }
-
     function startBoxSelection() {
-        // inicia el modo caja en “manual stop” (no sale al click ni ESC)
         graph.value?.startBoxSelection({ stop: "manual" });
         isBoxSelectionMode.value = true;
         updateSelectionTooltips();
     }
-
     function stopBoxSelection() {
         graph.value?.stopBoxSelection();
         isBoxSelectionMode.value = false;
@@ -78,285 +143,83 @@
         selectedEdges.value = [];
     }
 
-    const d3ForceEnabled = computed({
-        get: () => configs.view?.layoutHandler instanceof ForceLayout,
-        set: (value: boolean) => {
-            if (configs.view) {
-                configs.view.layoutHandler = value ? new ForceLayout() : new vNG.SimpleLayout();
-            }
-        },
-    });
-
-    const onNodeMoved = ({ nodeId, x, y }) => {
-        data.updateNodePosition(nodeId, { x, y });
-    };
-
-    const configs = reactive(
-        vNG.defineConfigs({
-            view: {
-                layoutHandler: new ForceLayout(),
-                panEnabled: true,
-                zoomEnabled: true,
-                boxSelectionEnabled: false,
-                selection: {
-                    box: {
-                        color: "#0000ff20",
-                        strokeWidth: 1,
-                        strokeColor: "#aaaaff",
-                        strokeDasharray: "0",
-                    },
-                },
-            },
-            node: {
-                normal: {
-                    type: "circle",
-                    radius: (node) => node.size,
-                    color: (node) => node.color,
-                },
-                hover: {
-                    radius: (node) => node.size + 2,
-                    color: (node) => node.color,
-                },
-                selectable: true,
-                label: {
-                    visible: (node) => !!node.label,
-                    directionAutoAdjustment: true,
-                    fontSize: 15,
-                    color: "black",
-                    fontFamily: "Arial",
-                    direction: "south",
-                },
-                focusring: {
-                    color: "darkgray",
-                },
-            },
-            edge: {
-                normal: {
-                    width: 2,
-                    color: (edge) => edge.color,
-                    dasharray: (edge) => (edge.dashed ? "4" : "0"),
-                },
-                selectable: true,
-                marker: {
-                    target: { type: "arrow" },
-                },
-                label: {
-                    fontSize: 40,
-                },
-            },
-        })
-    );
-
-    const tooltip = ref<HTMLDivElement>();
-    const tooltipData = ref<Record<string, any>>({});
-    const tooltipOpacity = ref(0);
-    const tooltipPos = ref({ left: "0px", top: "0px" });
-    const targetNodeId = ref<string>("");
-
-    const edgeTooltip = ref<HTMLDivElement>();
-    const edgeTooltipData = ref<Record<string, any>>({});
-    const edgeTooltipOpacity = ref(0);
-    const edgeTooltipPos = ref({ left: "0px", top: "0px" });
-    const targetEdgeId = ref<string>("");
-
+    // --- 6. Persistencia de layouts en localStorage ---
     watchEffect(() => {
         localStorage.setItem("layouts", JSON.stringify(layouts));
     });
 
-    onMounted(() => {
-        const savedLayouts = localStorage.getItem("layouts");
-        if (savedLayouts) {
-            const parsedLayouts = JSON.parse(savedLayouts);
-            Object.assign(layouts.nodes, parsedLayouts.nodes);
-        }
-    });
-
+    // --- 7. Tooltips Bootstrap para botones ---
     onMounted(() => {
         nextTick(() => {
-            // Reinicia (o crea) TODOS los tooltips sobre los botones
             document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
-                // Destruye cualquiera anterior
                 const prev = Tooltip.getInstance(el);
                 prev && prev.dispose();
-
-                // Crea el nuevo dentro de #graph-container
                 new Tooltip(el, {
                     placement: "right",
-                    container: "#graph-container", // 🔑  ahora vive dentro
-                    boundary: "clippingParents", // evita recortes
+                    container: "#graph-container",
+                    boundary: "clippingParents",
                 });
             });
         });
     });
 
+    // --- 8. Cargar nodos guardados, layouts y centrar al montar ---
     onMounted(() => {
-        data.loadNodesFromJson();
+        loadNodes();
         const savedLayouts = localStorage.getItem("layouts");
         if (savedLayouts) {
             const parsedLayouts = JSON.parse(savedLayouts);
             Object.assign(layouts.nodes, parsedLayouts.nodes);
         }
+        nextTick(() => {
+            graph.value?.fitToContents();
+        });
     });
 
+    // --- 9. Watch para recalcular tooltips selección múltiple ---
     watch(
-        () => [targetNodeId.value, tooltipOpacity.value],
+        () => selectedNodes.value.slice(),
         () => {
-            if (!graph.value || !tooltip.value || !targetNodeId.value) return;
-            const nodeLayout = layouts.nodes[targetNodeId.value];
-            if (nodeLayout) {
-                const domPoint = graph.value.translateFromSvgToDomCoordinates(nodeLayout);
-                tooltipPos.value = {
-                    left: `${domPoint.x - tooltip.value.offsetWidth / 2}px`,
-                    top: `${domPoint.y - tooltip.value.offsetHeight - 5}px`,
-                };
+            if (isBoxSelectionMode.value) {
+                updateSelectionTooltips();
             }
         }
     );
 
+    // --- 10. Event Handlers (usan métodos del composable de tooltips) ---
     const eventHandlers: vNG.EventHandlers = {
         "node:click": ({ node }) => {
-            // si estamos en modo box-selection, no disparamos el click
             if (isBoxSelectionMode.value) return;
             closeTooltip("node");
             const nodeData = nodes[node];
             const nodeLayout = layouts.nodes[node];
-            if (nodeData && nodeLayout && graph.value && tooltip.value) {
-                const domPoint = graph.value.translateFromSvgToDomCoordinates(nodeLayout);
-                tooltipData.value = {
-                    id: node,
-                    name: nodeData.name || `Nodo sin nombre (${node})`,
-                    x: nodeLayout.x.toFixed(2),
-                    y: nodeLayout.y.toFixed(2),
-                    data: nodeData.data,
-                };
-                tooltipPos.value = {
-                    left: `${domPoint.x - tooltip.value.offsetWidth / 2}px`,
-                    top: `${domPoint.y - tooltip.value.offsetHeight - 5}px`,
-                };
-                tooltipOpacity.value = 1;
-                targetNodeId.value = node;
+            if (nodeData && nodeLayout) {
+                showNodeTooltip(node, nodeData, nodeLayout);
             }
         },
-        "edge:click": (event: vNG.EdgeEvent<MouseEvent>) => {
+        "edge:click": (event) => {
             if (isBoxSelectionMode.value) return;
             closeTooltip("edge");
             const edge = event.edge;
             if (!edge) return;
             const edgeData = edges[edge];
-            if (edgeData && graph.value && edgeTooltip.value) {
+            if (edgeData) {
                 const sourcePos = layouts.nodes[edgeData.source];
                 const targetPos = layouts.nodes[edgeData.target];
-                if (!sourcePos || !targetPos) return;
-                const edgeCenter = {
-                    x: (sourcePos.x + targetPos.x) / 2,
-                    y: (sourcePos.y + targetPos.y) / 2,
-                };
-                const domPoint = graph.value.translateFromSvgToDomCoordinates(edgeCenter);
-                edgeTooltipData.value = {
-                    id: edge,
-                    name: `Conexión entre ${nodes[edgeData.source].name} y ${
-                        nodes[edgeData.target].name
-                    }`,
-                    porcentajeParticipacion: edgeData.porcentajeParticipacion,
-                    porcentajeParticipacionUtilidades: edgeData.porcentajeParticipacionUtilidades,
-                };
-                edgeTooltipPos.value = {
-                    left: `${domPoint.x - edgeTooltip.value.offsetWidth / 2}px`,
-                    top: `${domPoint.y - edgeTooltip.value.offsetHeight - 5}px`,
-                };
-                edgeTooltipOpacity.value = 1;
-                targetEdgeId.value = edge;
+                if (sourcePos && targetPos) {
+                    showEdgeTooltip(edge, edgeData, sourcePos, targetPos, nodes);
+                }
             }
         },
-        // detectar cambio a modo box-selection
         "view:mode": (mode: string) => {
             if (mode === "box-selection") {
                 isBoxSelectionMode.value = true;
                 updateSelectionTooltips();
             }
-            // omitimos el clear automático al salir de box-selection
         },
     };
 
-    function closeTooltip(type: string) {
-        if (type === "node") {
-            tooltipOpacity.value = 0;
-            targetNodeId.value = "";
-        } else if (type === "edge") {
-            edgeTooltipOpacity.value = 0;
-            targetEdgeId.value = "";
-        }
-    }
-
-    async function downloadAsSvg() {
-        if (!graph.value) return;
-        try {
-            const svgText = await graph.value.exportAsSvgText();
-            const blob = new Blob([svgText], { type: "image/svg+xml" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "network-graph.svg";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error("Error al exportar como SVG:", error);
-        }
-    }
-
-    // Variables para el modal usando Bootstrap (sin Element Plus)
-    const newNodeForm = reactive({
-        nombre: "",
-        rut: "",
-        tipo: "",
-        capitalEnterado: 0,
-        lineaNegocio: "",
-    });
-
-    let addNodeModalInstance: any = null;
-    const addNodeModalEl = ref<HTMLDivElement | null>(null);
-
-    onMounted(() => {
-        loadNodes();
-        addNodeModalEl.value = document.getElementById("addNodeModal") as HTMLDivElement | null;
-    });
-
-    function openAddNodeModal() {
-        newNodeForm.nombre = "";
-        newNodeForm.rut = "";
-        newNodeForm.tipo = "";
-        newNodeForm.capitalEnterado = 0;
-        newNodeForm.lineaNegocio = "";
-
-        if (addNodeModalEl.value) {
-            addNodeModalInstance = new (window as any).bootstrap.Modal(addNodeModalEl.value);
-            addNodeModalInstance.show();
-        }
-    }
-
-    function closeAddNodeModal() {
-        if (addNodeModalInstance) {
-            addNodeModalInstance.hide();
-        }
-    }
-
-    function confirmAddNode() {
-        if (!newNodeForm.nombre || !newNodeForm.rut) {
-            alert("Por favor completa al menos el nombre y el RUT.");
-            return;
-        }
-        addNode(
-            newNodeForm.nombre,
-            newNodeForm.rut,
-            newNodeForm.tipo,
-            newNodeForm.capitalEnterado,
-            newNodeForm.lineaNegocio
-        );
-        closeAddNodeModal();
-    }
-
+    // --- 11. CRUD nodos/aristas y helpers (modal eliminado) ---
     function addNode(
         name: string,
         rut: string,
@@ -368,17 +231,17 @@
         const x = Math.random() * 400;
         const y = Math.random() * 400;
         nodes[nodeId] = {
-            name,
+            name: name ?? "",
             x,
             y,
             size: 15,
             color: "#0064a0",
             label: true,
             data: {
-                rut,
-                tipo,
-                capitalEnterado,
-                lineaNegocio,
+                rut: rut ?? "",
+                tipo: tipo ?? "",
+                capitalEnterado: capitalEnterado ?? 0,
+                lineaNegocio: lineaNegocio ?? "",
             },
             icon: "&#xe7fd;",
         };
@@ -392,20 +255,13 @@
         }
         selectedNodes.value = [];
     }
-
     function handleRemoveNode() {
         const btn = deleteBtn.value;
-
-        // 1) Ocultar el tooltip de Bootstrap (botón)
         if (btn) {
             const tipInst = Tooltip.getInstance(btn);
-            if (tipInst) {
-                tipInst.hide();
-            }
+            if (tipInst) tipInst.hide();
             btn.blur();
         }
-
-        // 2) Validación de selección
         if (selectedNodes.value.length === 0) {
             return Swal.fire({
                 target: "#graph-container",
@@ -417,7 +273,6 @@
                 customClass: {
                     popup: "sii-swal-popup",
                     header: "sii-swal-header-error",
-                    //title: "sii-swal-title",
                     icon: "sii-swal-icon",
                     confirmButton: "sii-swal-confirm-btn",
                     closeButton: "sii-swal-close-btn",
@@ -425,8 +280,6 @@
                 confirmButtonText: "Entendido",
             });
         }
-
-        // 3) Confirmación de borrado
         Swal.fire({
             target: "#graph-container",
             title: "¿Estás seguro?",
@@ -441,7 +294,6 @@
             customClass: {
                 popup: "sii-swal-popup",
                 header: "sii-swal-header-error",
-                //title: "sii-swal-title",
                 icon: "sii-swal-icon",
                 confirmButton: "sii-swal-confirm-btn",
                 cancelButton: "sii-swal-cancel-btn",
@@ -449,24 +301,14 @@
             } as any,
         }).then((result) => {
             if (!result.isConfirmed) return;
-
-            // 4) Ocultar tooltip persistente de VNG
             tooltipOpacity.value = 0;
             targetNodeId.value = "";
-
-            // 5) Eliminar el nodo
             removeNode();
-
-            // 6) Asegurar que el tooltip de Bootstrap esté oculto y sin focus
             if (btn) {
                 const tipInst2 = Tooltip.getInstance(btn);
-                if (tipInst2) {
-                    tipInst2.hide();
-                }
+                if (tipInst2) tipInst2.hide();
                 btn.blur();
             }
-
-            // 7) Mensaje de éxito
             Swal.fire({
                 target: "#graph-container",
                 icon: "success",
@@ -477,7 +319,6 @@
                 customClass: {
                     popup: "sii-swal-popup",
                     header: "sii-swal-header-info",
-                    //title: "sii-swal-title",
                     icon: "sii-swal-icon",
                     confirmButton: "sii-swal-confirm-btn",
                     closeButton: "sii-swal-close-btn",
@@ -486,17 +327,13 @@
             });
         });
     }
-
     function handleRemoveEdge() {
         const btn = deleteEdgeBtn.value;
-        // 1) Ocultar tooltip Bootstrap
         if (btn) {
             const inst = Tooltip.getInstance(btn);
             if (inst) inst.hide();
             btn.blur();
         }
-
-        // 2) Validación
         if (selectedEdges.value.length === 0) {
             return Swal.fire({
                 target: "#graph-container",
@@ -508,7 +345,6 @@
                 customClass: {
                     popup: "sii-swal-popup",
                     header: "sii-swal-header-error",
-                    //title: "sii-swal-title",
                     icon: "sii-swal-icon",
                     confirmButton: "sii-swal-confirm-btn",
                     closeButton: "sii-swal-close-btn",
@@ -516,8 +352,6 @@
                 confirmButtonText: "Entendido",
             });
         }
-
-        // 3) Confirmación
         Swal.fire({
             target: "#graph-container",
             title: "¿Eliminar arista?",
@@ -532,7 +366,6 @@
             customClass: {
                 popup: "sii-swal-popup",
                 header: "sii-swal-header-error",
-                //title: "sii-swal-title",
                 icon: "sii-swal-icon",
                 confirmButton: "sii-swal-confirm-btn",
                 cancelButton: "sii-swal-cancel-btn",
@@ -540,19 +373,14 @@
             } as any,
         }).then((r) => {
             if (!r.isConfirmed) return;
-
-            // ocultar tooltips VNG
             edgeTooltipOpacity.value = 0;
             targetEdgeId.value = "";
-            // eliminar arista
             removeEdge();
-            // ocultar de nuevo el tooltip Bootstrap
             if (btn) {
                 const inst2 = Tooltip.getInstance(btn);
                 if (inst2) inst2.hide();
                 btn.blur();
             }
-            // mensaje éxito
             Swal.fire({
                 target: "#graph-container",
                 icon: "success",
@@ -563,7 +391,6 @@
                 customClass: {
                     popup: "sii-swal-popup",
                     header: "sii-swal-header-info",
-                    //title: "sii-swal-title",
                     icon: "sii-swal-icon",
                     confirmButton: "sii-swal-confirm-btn",
                     closeButton: "sii-swal-close-btn",
@@ -572,7 +399,6 @@
             });
         });
     }
-
     function handleCreateEdge() {
         const btn = createEdgeBtn.value;
         if (btn) {
@@ -580,8 +406,6 @@
             if (inst) inst.hide();
             btn.blur();
         }
-
-        // Si no hay exactamente dos nodos seleccionados, advertimos sobre SHIFT+clic
         if (selectedNodes.value.length !== 2) {
             return Swal.fire({
                 target: "#graph-container",
@@ -600,20 +424,17 @@
                 confirmButtonText: "Entendido",
             });
         }
-
-        // Si llegamos aquí, ya hay dos nodos seleccionados: pedimos confirmación
         const [src, tgt] = selectedNodes.value;
         Swal.fire({
             target: "#graph-container",
             title: " ¿Crear arista entre?",
             html: `
-    <span class="sii-swal-text">
-
-      <span class="sii-node-name">${nodes[src].name}</span>
-      y
-      <span class="sii-node-name">${nodes[tgt].name}</span>
-    </span>
-  `,
+      <span class="sii-swal-text">
+        <span class="sii-node-name">${nodes[src].name}</span>
+        y
+        <span class="sii-node-name">${nodes[tgt].name}</span>
+      </span>
+    `,
             icon: "question",
             iconColor: "#0F69B4",
             background: "#FFFFFF",
@@ -651,7 +472,6 @@
             });
         });
     }
-
     function addEdge() {
         if (selectedNodes.value.length !== 2) {
             alert("Por favor selecciona exactamente dos nodos para crear una arista.");
@@ -660,14 +480,12 @@
         const [source, target] = selectedNodes.value;
         const edgeId = `edge${nextEdgeIndex.value}`;
         const edgeColor = "#002C48";
-
         const porcentajeParticipacion = parseFloat(
             prompt("Ingrese el porcentaje de participación:", "0") || "0"
         );
         const porcentajeParticipacionUtilidades = parseFloat(
             prompt("Ingrese el porcentaje de participación en utilidades:", "0") || "0"
         );
-
         edges[edgeId] = {
             source,
             target,
@@ -677,14 +495,12 @@
         };
         nextEdgeIndex.value++;
     }
-
     function removeEdge() {
         for (const edgeId of selectedEdges.value) {
             delete edges[edgeId];
         }
         selectedEdges.value = [];
     }
-
     function updateNodeName() {
         if (selectedNodes.value.length === 1) {
             const nodeId = selectedNodes.value[0];
@@ -695,48 +511,7 @@
         }
     }
 
-    // 7) Watchers al final, **después** de todas las declaraciones
-    // Recalcular tooltips cada vez que cambie la selección
-    watch(
-        () => selectedNodes.value.slice(),
-        () => {
-            if (isBoxSelectionMode.value) {
-                updateSelectionTooltips();
-            }
-        }
-    );
-
-    // function saveNodes() {
-    //     const currentGraphState = {
-    //         nodes: { ...nodes },
-    //         edges: { ...edges },
-    //         nextNodeIndex: nextNodeIndex.value,
-    //         nextEdgeIndex: nextEdgeIndex.value,
-    //     };
-    //     localStorage.setItem("savedGraphState", JSON.stringify(currentGraphState));
-    //     alert("Nodos y aristas guardados correctamente.");
-    // }
-
-    // function loadNodes() {
-    //     const savedGraphState = localStorage.getItem("savedGraphState");
-    //     if (savedGraphState) {
-    //         const {
-    //             nodes: savedNodes,
-    //             edges: savedEdges,
-    //             nextNodeIndex: savedNodeIndex,
-    //             nextEdgeIndex: savedEdgeIndex,
-    //         } = JSON.parse(savedGraphState);
-    //         for (const nodeId in savedNodes) {
-    //             nodes[nodeId] = { ...nodes[nodeId], ...savedNodes[nodeId] };
-    //         }
-    //         for (const edgeId in savedEdges) {
-    //             edges[edgeId] = { ...edges[edgeId], ...savedEdges[edgeId] };
-    //         }
-    //         nextNodeIndex.value = savedNodeIndex;
-    //         nextEdgeIndex.value = savedEdgeIndex;
-    //     }
-    // }
-
+    // --- 12. Persistencia y restauración del grafo completo ---
     function saveNodes() {
         const cleanNodes = {};
         for (const k in nodes) {
@@ -753,8 +528,6 @@
             nextEdgeIndex: nextEdgeIndex.value,
         };
         localStorage.setItem("savedGraphState", JSON.stringify(currentGraphState));
-
-        // Muestra el mensaje con SweetAlert2
         Swal.fire({
             target: "#graph-container",
             icon: "success",
@@ -765,7 +538,6 @@
             showConfirmButton: false,
             timer: 1200,
             timerProgressBar: true,
-            //position: "bottom-end", // Esquina inferior derecha del container
             customClass: {
                 popup: "sii-swal-popup",
                 header: "sii-swal-header-info",
@@ -776,7 +548,6 @@
             } as any,
         });
     }
-
     function loadNodes() {
         const savedGraphState = localStorage.getItem("savedGraphState");
         if (savedGraphState) {
@@ -786,55 +557,52 @@
                 nextNodeIndex: savedNodeIndex,
                 nextEdgeIndex: savedEdgeIndex,
             } = JSON.parse(savedGraphState);
-
-            // Limpia todos los nodos y edges existentes antes de cargar los nuevos
             Object.keys(nodes).forEach((k) => delete nodes[k]);
             Object.keys(edges).forEach((k) => delete edges[k]);
-
-            // Carga los nuevos nodos y edges
             for (const nodeId in savedNodes) {
                 nodes[nodeId] = { ...savedNodes[nodeId] };
             }
             for (const edgeId in savedEdges) {
                 edges[edgeId] = { ...savedEdges[edgeId] };
             }
-
             nextNodeIndex.value = savedNodeIndex;
             nextEdgeIndex.value = savedEdgeIndex;
         }
     }
-
     function toggleFullscreen() {
-        // Oculta tooltips visibles
         document.querySelectorAll(".tooltip.show").forEach((t) => t.classList.remove("show"));
-
         if (!document.fullscreenElement) {
             graphContainer.value?.requestFullscreen();
         } else {
             document.exitFullscreen?.();
         }
     }
-
-    onMounted(() => {
-        data.loadNodesFromJson();
-        nextTick(() => {
-            // Centra y ajusta el zoom para que encaje todo el grafo
-            graph.value?.fitToContents();
-            // Si quieres sin márgenes, puedes pasar { margin: 0 }:
-            // graph.value?.fitToContents({ margin: 0 });
-        });
-    });
-
     function onSelectedNodesUpdate(newSelection: string[]) {
-        // Si estamos en modo caja y va a limpiarse (newSelection=[]), lo ignoramos:
         if (isBoxSelectionMode.value && newSelection.length === 0) {
             return;
         }
-        // En cualquier otro caso, aceptamos la nueva selección:
         selectedNodes.value = newSelection;
-        // Y si estamos en modo caja, refrescamos tooltips:
         if (isBoxSelectionMode.value) {
             updateSelectionTooltips();
+        }
+    }
+
+    // --- 13. Export SVG ---
+    async function downloadAsSvg() {
+        if (!graph.value) return;
+        try {
+            const svgText = await graph.value.exportAsSvgText();
+            const blob = new Blob([svgText], { type: "image/svg+xml" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "network-graph.svg";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Error al exportar como SVG:", error);
         }
     }
 </script>
@@ -1076,19 +844,38 @@
             <!-- Tooltip Nodos -->
             <div ref="tooltip" class="tooltip" :style="{ ...tooltipPos, opacity: tooltipOpacity }">
                 <button class="close-btn" @click="closeTooltip('node')">×</button>
-                <div><strong>Nombre:</strong> {{ tooltipData.name }}</div>
+                <div class="d-flex align-items-center">
+                    <strong>Nombre:</strong> {{ tooltipData.name }}
+                    <!-- 🟢 Botón Editar Nodo -->
+                    <button
+                        class="btn btn-link btn-sm p-0 ms-2"
+                        style="color: #0f69b4"
+                        @click="openEditNodeModal(tooltipData)">
+                        <i class="bi bi-pencil-square"></i>
+                    </button>
+                </div>
                 <div v-if="tooltipData.data">
-                    <div><strong>RUT:</strong> {{ tooltipData.data.rut }}</div>
-                    <div><strong>Tipo:</strong> {{ tooltipData.data.tipo }}</div>
-                    <div v-if="tooltipData.data.capitalEnterado">
-                        <strong>Capital Enterado:</strong> {{ tooltipData.data.capitalEnterado }}
+                    <div><strong>RUT:</strong> {{ tooltipData.data?.rut ?? "" }}</div>
+                    <div><strong>Tipo:</strong> {{ tooltipData.data?.tipo ?? "" }}</div>
+                    <div v-if="tooltipData.data?.capitalEnterado !== undefined">
+                        <strong>Capital Enterado:</strong>
+                        {{ tooltipData.data?.capitalEnterado ?? 0 }}
                     </div>
-                    <div v-if="tooltipData.data.lineaNegocio">
-                        <strong>Línea de Negocio:</strong> {{ tooltipData.data.lineaNegocio }}
+                    <div v-if="tooltipData.data?.lineaNegocio">
+                        <strong>Línea de Negocio:</strong>
+                        {{ tooltipData.data?.lineaNegocio ?? "" }}
                     </div>
                 </div>
-                <!-- <div><strong>Posición:</strong> ({{ tooltipData.x }}, {{ tooltipData.y }})</div> -->
             </div>
+
+            <!-- Modal de edición de nodo (justo después del NodeModal) -->
+            <!-- 👇 Solo si el modal está visible se pasa la prop -->
+            <EditNodeModal
+                v-if="showEditNodeModal"
+                :show="showEditNodeModal"
+                :node="editNodeData"
+                :onClose="() => (showEditNodeModal = false)"
+                :onConfirm="handleConfirmEditNode" />
 
             <!-- Tooltip Aristas -->
             <div
@@ -1143,75 +930,10 @@
         </div>
 
         <!-- Modal Bootstrap para crear nodo -->
-        <div
-            class="modal fade"
-            id="addNodeModal"
-            tabindex="-1"
-            aria-labelledby="addNodeModalLabel"
-            aria-hidden="true">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 id="addNodeModalLabel" class="modal-title">
-                            <i class="bi bi-plus-circle text-warning"></i> Crear Nodo
-                        </h5>
-                        <button
-                            type="button"
-                            class="btn-close"
-                            @click="closeAddNodeModal"
-                            aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="mb-2">
-                            <label>Nombre:</label>
-                            <input
-                                v-model="newNodeForm.nombre"
-                                type="text"
-                                class="form-control form-control-sm" />
-                        </div>
-                        <div class="mb-2">
-                            <label>RUT:</label>
-                            <input
-                                v-model="newNodeForm.rut"
-                                type="text"
-                                class="form-control form-control-sm" />
-                        </div>
-                        <div class="mb-2">
-                            <label>Tipo:</label>
-                            <input
-                                v-model="newNodeForm.tipo"
-                                type="text"
-                                class="form-control form-control-sm" />
-                        </div>
-                        <div class="mb-2">
-                            <label>Capital Enterado:</label>
-                            <input
-                                v-model.number="newNodeForm.capitalEnterado"
-                                type="number"
-                                class="form-control form-control-sm" />
-                        </div>
-                        <div class="mb-2">
-                            <label>Línea de Negocio:</label>
-                            <input
-                                v-model="newNodeForm.lineaNegocio"
-                                type="text"
-                                class="form-control form-control-sm" />
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button
-                            class="btn btn-warning text-white"
-                            type="button"
-                            @click="closeAddNodeModal">
-                            Cancelar
-                        </button>
-                        <button class="btn btn-primary" type="button" @click="confirmAddNode">
-                            Crear Nodo
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <NodeModal
+            :show="showAddNodeModal"
+            :onClose="() => (showAddNodeModal = false)"
+            :onConfirm="handleConfirmAddNode" />
     </div>
 </template>
 
@@ -1230,7 +952,6 @@
         overflow: visible; /* <— permite scroll si los nodos se salen */
     }
 
-    /* Estilos para el contenedor del ícono de fullscreen */
     /* Estilos para el contenedor del ícono de fullscreen */
     .fullscreen-wrapper {
         position: absolute;
@@ -1368,6 +1089,7 @@
 
     .tooltip[style*="opacity: 1"] {
         opacity: 1;
+        pointer-events: auto; /* Permitir interacción cuando el tooltip está visible */
     }
 
     .close-btn {
