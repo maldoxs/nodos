@@ -1,21 +1,20 @@
 <script setup lang="ts">
-    // --- 1. Imports principales ---
-    import { reactive, ref, onMounted, watch, watchEffect, nextTick } from "vue";
+    import { ref, reactive, onMounted, watch, watchEffect, nextTick } from "vue";
     import * as vNG from "v-network-graph";
     import { Tooltip } from "bootstrap";
     import Swal from "sweetalert2";
     import ExcelExportButton from "../components/ExcelExportButton.vue";
 
-    // --- 2. Modularización de composables --- 🔄
+    // Composables de estado, config y tooltips
     import { useGraphState } from "../composables/useGraphState";
     import { useGraphConfigs } from "../composables/useGraphConfigs";
     import { useGraphTooltips } from "../composables/useGraphTooltips";
+    import { useGraphCrud } from "../composables/useGraphCrud"; // ✅ Nuevo centralizado
 
-    //--- Componentes -----//
     import NodeModal from "../components/NodeModal.vue";
     import EditNodeModal from "../components/EditNodeModal.vue";
 
-    // --- Estados para edición de nodo ---
+    // --- Estados para edición de nodo (para el modal) ---
     const showEditNodeModal = ref(false);
     const editNodeData = reactive({
         nodeId: "",
@@ -26,92 +25,15 @@
         lineaNegocio: "",
     });
 
-    // --- Método para abrir modal de edición ---
-    function openEditNodeModal(tooltipData) {
-        console.log("Abriendo modal para editar:", tooltipData);
-        Object.assign(editNodeData, {
-            nodeId: tooltipData.id,
-            nombre: tooltipData.name ?? "",
-            rut: tooltipData.data?.rut ?? "",
-            tipo: tooltipData.data?.tipo ?? "",
-            capitalEnterado: tooltipData.data?.capitalEnterado ?? 0,
-            lineaNegocio: tooltipData.data?.lineaNegocio ?? "",
-        });
-        showEditNodeModal.value = true;
-    }
-
-    // ...
-
-    function handleConfirmEditNode(data: any) {
-        // Cierra el modal de edición antes de mostrar la alerta
-        showEditNodeModal.value = false;
-        nextTick(() => {
-            Swal.fire({
-                title: "¿Está seguro de editar este nodo?",
-                text: "Se actualizarán los datos del nodo seleccionado.",
-                icon: "warning",
-                showCancelButton: true,
-                confirmButtonText: "Sí, guardar cambios",
-                cancelButtonText: "Cancelar",
-                reverseButtons: true,
-                customClass: {
-                    popup: "sii-swal-popup",
-                    header: "sii-swal-header-info",
-                    icon: "sii-swal-icon",
-                    confirmButton: "sii-swal-confirm-btn",
-                    cancelButton: "sii-swal-cancel-btn",
-                    closeButton: "sii-swal-close-btn",
-                } as any,
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    const nodeId = data.nodeId;
-                    if (nodes[nodeId] && nodes[nodeId].data) {
-                        nodes[nodeId].name = data.nombre;
-                        nodes[nodeId].data.rut = data.rut ?? "";
-                        nodes[nodeId].data.tipo = data.tipo ?? "";
-                        nodes[nodeId].data.capitalEnterado = data.capitalEnterado ?? 0;
-                        nodes[nodeId].data.lineaNegocio = data.lineaNegocio ?? "";
-                        closeTooltip("node");
-                        // Mensaje de éxito
-                        Swal.fire({
-                            icon: "success",
-                            title: "¡Nodo actualizado!",
-                            text: "El nodo ha sido editado correctamente.",
-                            iconColor: "#20c997",
-                            background: "#FFFFFF",
-                            confirmButtonText: "Cerrar",
-                            customClass: {
-                                popup: "sii-swal-popup",
-                                header: "sii-swal-header-info",
-                                icon: "sii-swal-icon",
-                                confirmButton: "sii-swal-confirm-btn",
-                                closeButton: "sii-swal-close-btn",
-                            } as any,
-                        });
-                    }
-                }
-            });
-        });
-    }
-
-    // --- 3. Graph refs y estado base ---
+    // --- Graph refs y básicos ---
     const graph = ref<vNG.Instance | null>(null);
     const graphContainer = ref<HTMLDivElement | null>(null);
     const deleteBtn = ref<HTMLButtonElement | null>(null);
     const deleteEdgeBtn = ref<HTMLButtonElement | null>(null);
     const createEdgeBtn = ref<HTMLButtonElement | null>(null);
-
     const showAddNodeModal = ref(false);
 
-    function openAddNodeModal() {
-        showAddNodeModal.value = true;
-    }
-    function handleConfirmAddNode(data) {
-        addNode(data.nombre, data.rut, data.tipo, data.capitalEnterado, data.lineaNegocio);
-        showAddNodeModal.value = false;
-    }
-
-    // --- 4. Estados del grafo (nodos, aristas, layouts, selección, etc.) ---
+    // --- Estados base del grafo (nodos, aristas, selección, etc.) ---
     const {
         nodes,
         edges,
@@ -140,7 +62,44 @@
         closeTooltip,
     } = useGraphTooltips(graph, layouts);
 
-    // --- 5. Selección por caja ---
+    // --- CRUD centralizado (importante: pasar referencias/reactives) ---
+    const {
+        addNode,
+        openEditNodeModal,
+        handleConfirmEditNode,
+        removeNode,
+        handleRemoveNode,
+        addEdge,
+        handleCreateEdge,
+        removeEdge,
+        handleRemoveEdge,
+        updateNodeName,
+        saveNodes,
+        loadNodes,
+    } = useGraphCrud({
+        nodes,
+        edges,
+        layouts,
+        nextNodeIndex,
+        nextEdgeIndex,
+        selectedNodes,
+        selectedEdges,
+        newNodeName,
+        closeTooltip,
+        showEditNodeModal,
+        editNodeData,
+    });
+
+    // --- Modal creación de nodo ---
+    function openAddNodeModal() {
+        showAddNodeModal.value = true;
+    }
+    function handleConfirmAddNode(data) {
+        addNode(data.nombre, data.rut, data.tipo, data.capitalEnterado, data.lineaNegocio);
+        showAddNodeModal.value = false;
+    }
+
+    // --- Selección por caja y tooltips múltiples ---
     const isBoxSelectionMode = ref(false);
     const selectionTooltips = ref<Array<{ id: string; left: string; top: string; data: any }>>([]);
     const verticalGap = 8;
@@ -183,12 +142,12 @@
         selectedEdges.value = [];
     }
 
-    // --- 6. Persistencia de layouts en localStorage ---
+    // --- Persistencia layouts ---
     watchEffect(() => {
         localStorage.setItem("layouts", JSON.stringify(layouts));
     });
 
-    // --- 7. Tooltips Bootstrap para botones ---
+    // --- Tooltips Bootstrap para botones ---
     onMounted(() => {
         nextTick(() => {
             document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
@@ -203,7 +162,7 @@
         });
     });
 
-    // --- 8. Cargar nodos guardados, layouts y centrar al montar ---
+    // --- Cargar nodos/layouts al montar ---
     onMounted(() => {
         loadNodes();
         const savedLayouts = localStorage.getItem("layouts");
@@ -216,26 +175,22 @@
         });
     });
 
-    // --- 9. Watch para recalcular tooltips selección múltiple ---
+    // --- Watch tooltips selección múltiple ---
     watch(
         () => selectedNodes.value.slice(),
         () => {
-            if (isBoxSelectionMode.value) {
-                updateSelectionTooltips();
-            }
+            if (isBoxSelectionMode.value) updateSelectionTooltips();
         }
     );
 
-    // --- 10. Event Handlers (usan métodos del composable de tooltips) ---
+    // --- Handlers de eventos del grafo ---
     const eventHandlers: vNG.EventHandlers = {
         "node:click": ({ node }) => {
             if (isBoxSelectionMode.value) return;
             closeTooltip("node");
             const nodeData = nodes[node];
             const nodeLayout = layouts.nodes[node];
-            if (nodeData && nodeLayout) {
-                showNodeTooltip(node, nodeData, nodeLayout);
-            }
+            if (nodeData && nodeLayout) showNodeTooltip(node, nodeData, nodeLayout);
         },
         "edge:click": (event) => {
             if (isBoxSelectionMode.value) return;
@@ -246,9 +201,8 @@
             if (edgeData) {
                 const sourcePos = layouts.nodes[edgeData.source];
                 const targetPos = layouts.nodes[edgeData.target];
-                if (sourcePos && targetPos) {
+                if (sourcePos && targetPos)
                     showEdgeTooltip(edge, edgeData, sourcePos, targetPos, nodes);
-                }
             }
         },
         "view:mode": (mode: string) => {
@@ -259,353 +213,7 @@
         },
     };
 
-    // --- 11. CRUD nodos/aristas y helpers (modal eliminado) ---
-    function addNode(
-        name: string,
-        rut: string,
-        tipo: string,
-        capitalEnterado: number,
-        lineaNegocio: string
-    ) {
-        const nodeId = `node${nextNodeIndex.value}`;
-        const x = Math.random() * 400;
-        const y = Math.random() * 400;
-        nodes[nodeId] = {
-            name: name ?? "",
-            x,
-            y,
-            size: 15,
-            color: "#0064a0",
-            label: true,
-            data: {
-                rut: rut ?? "",
-                tipo: tipo ?? "",
-                capitalEnterado: capitalEnterado ?? 0,
-                lineaNegocio: lineaNegocio ?? "",
-            },
-            icon: "&#xe7fd;",
-        };
-        layouts.nodes[nodeId] = { x, y };
-        nextNodeIndex.value++;
-    }
-
-    function removeNode() {
-        for (const nodeId of selectedNodes.value) {
-            delete nodes[nodeId];
-        }
-        selectedNodes.value = [];
-    }
-    function handleRemoveNode() {
-        const btn = deleteBtn.value;
-        if (btn) {
-            const tipInst = Tooltip.getInstance(btn);
-            if (tipInst) tipInst.hide();
-            btn.blur();
-        }
-        if (selectedNodes.value.length === 0) {
-            return Swal.fire({
-                target: "#graph-container",
-                icon: "warning",
-                title: "Atención",
-                text: "Para eliminar un nodo primero debe seleccionarlo",
-                iconColor: "#FF4F4F",
-                background: "#FFFFFF",
-                customClass: {
-                    popup: "sii-swal-popup",
-                    header: "sii-swal-header-error",
-                    icon: "sii-swal-icon",
-                    confirmButton: "sii-swal-confirm-btn",
-                    closeButton: "sii-swal-close-btn",
-                } as any,
-                confirmButtonText: "Entendido",
-            });
-        }
-        Swal.fire({
-            target: "#graph-container",
-            title: "¿Estás seguro?",
-            text: "Se eliminará el nodo seleccionado.",
-            icon: "warning",
-            iconColor: "#FF4F4F",
-            background: "#FFFFFF",
-            showCancelButton: true,
-            reverseButtons: true,
-            cancelButtonText: "Cancelar",
-            confirmButtonText: "Sí, eliminar",
-            customClass: {
-                popup: "sii-swal-popup",
-                header: "sii-swal-header-error",
-                icon: "sii-swal-icon",
-                confirmButton: "sii-swal-confirm-btn",
-                cancelButton: "sii-swal-cancel-btn",
-                closeButton: "sii-swal-close-btn",
-            } as any,
-        }).then((result) => {
-            if (!result.isConfirmed) return;
-            tooltipOpacity.value = 0;
-            targetNodeId.value = "";
-            removeNode();
-            if (btn) {
-                const tipInst2 = Tooltip.getInstance(btn);
-                if (tipInst2) tipInst2.hide();
-                btn.blur();
-            }
-            Swal.fire({
-                target: "#graph-container",
-                icon: "success",
-                title: "¡Eliminado!",
-                text: "El nodo ha sido eliminado.",
-                iconColor: "#20c997",
-                background: "#FFFFFF",
-                customClass: {
-                    popup: "sii-swal-popup",
-                    header: "sii-swal-header-info",
-                    icon: "sii-swal-icon",
-                    confirmButton: "sii-swal-confirm-btn",
-                    closeButton: "sii-swal-close-btn",
-                } as any,
-                confirmButtonText: "Cerrar",
-            });
-        });
-    }
-    function handleRemoveEdge() {
-        const btn = deleteEdgeBtn.value;
-        if (btn) {
-            const inst = Tooltip.getInstance(btn);
-            if (inst) inst.hide();
-            btn.blur();
-        }
-        if (selectedEdges.value.length === 0) {
-            return Swal.fire({
-                target: "#graph-container",
-                icon: "warning",
-                title: "Atención",
-                text: "Para eliminar una arista primero debe seleccionarla",
-                iconColor: "#FF4F4F",
-                background: "#FFFFFF",
-                customClass: {
-                    popup: "sii-swal-popup",
-                    header: "sii-swal-header-error",
-                    icon: "sii-swal-icon",
-                    confirmButton: "sii-swal-confirm-btn",
-                    closeButton: "sii-swal-close-btn",
-                } as any,
-                confirmButtonText: "Entendido",
-            });
-        }
-        Swal.fire({
-            target: "#graph-container",
-            title: "¿Eliminar arista?",
-            text: "Se eliminará la(s) arista(s) seleccionada(s).",
-            icon: "warning",
-            iconColor: "#FF4F4F",
-            background: "#FFFFFF",
-            showCancelButton: true,
-            reverseButtons: true,
-            cancelButtonText: "Cancelar",
-            confirmButtonText: "Sí, eliminar",
-            customClass: {
-                popup: "sii-swal-popup",
-                header: "sii-swal-header-error",
-                icon: "sii-swal-icon",
-                confirmButton: "sii-swal-confirm-btn",
-                cancelButton: "sii-swal-cancel-btn",
-                closeButton: "sii-swal-close-btn",
-            } as any,
-        }).then((r) => {
-            if (!r.isConfirmed) return;
-            edgeTooltipOpacity.value = 0;
-            targetEdgeId.value = "";
-            removeEdge();
-            if (btn) {
-                const inst2 = Tooltip.getInstance(btn);
-                if (inst2) inst2.hide();
-                btn.blur();
-            }
-            Swal.fire({
-                target: "#graph-container",
-                icon: "success",
-                title: "¡Arista eliminada!",
-                text: "La arista ha sido eliminada.",
-                iconColor: "#20c997",
-                background: "#FFFFFF",
-                customClass: {
-                    popup: "sii-swal-popup",
-                    header: "sii-swal-header-info",
-                    icon: "sii-swal-icon",
-                    confirmButton: "sii-swal-confirm-btn",
-                    closeButton: "sii-swal-close-btn",
-                } as any,
-                confirmButtonText: "Cerrar",
-            });
-        });
-    }
-    function handleCreateEdge() {
-        const btn = createEdgeBtn.value;
-        if (btn) {
-            const inst = Tooltip.getInstance(btn);
-            if (inst) inst.hide();
-            btn.blur();
-        }
-        if (selectedNodes.value.length !== 2) {
-            return Swal.fire({
-                target: "#graph-container",
-                icon: "info",
-                title: "Modo creación",
-                text: "Para crear una arista mantén presionada la tecla Shift mientras haces clic en dos nodos (primero uno, luego otro).",
-                iconColor: "#0F69B4",
-                background: "#FFFFFF",
-                customClass: {
-                    popup: "sii-swal-popup",
-                    header: "sii-swal-header-info",
-                    icon: "sii-swal-icon",
-                    confirmButton: "sii-swal-confirm-btn",
-                    closeButton: "sii-swal-close-btn",
-                } as any,
-                confirmButtonText: "Entendido",
-            });
-        }
-        // Llama directo a addEdge (solo si hay 2 nodos seleccionados)
-        addEdge();
-    }
-
-    function addEdge() {
-        if (selectedNodes.value.length !== 2) {
-            // Esto nunca debería entrar porque ya validaste arriba
-            return;
-        }
-        const [source, target] = selectedNodes.value;
-
-        // Primer SweetAlert: porcentaje de participación
-        Swal.fire({
-            title: "Porcentaje de Participación",
-            input: "number",
-            inputLabel: "Ingrese el porcentaje de participación:",
-            inputValue: 0,
-            inputAttributes: {
-                min: "0",
-                max: "100",
-                step: "0.01",
-            },
-            showCancelButton: true,
-            confirmButtonText: "Siguiente",
-            cancelButtonText: "Cancelar",
-        }).then((result) => {
-            if (!result.isConfirmed) return;
-            const porcentajeParticipacion = parseFloat(result.value || "0");
-
-            // Segundo SweetAlert: porcentaje de utilidades
-            Swal.fire({
-                title: "Porcentaje de Utilidades",
-                input: "number",
-                inputLabel: "Ingrese el porcentaje de participación en utilidades:",
-                inputValue: 0,
-                inputAttributes: {
-                    min: "0",
-                    max: "100",
-                    step: "0.01",
-                },
-                showCancelButton: true,
-                confirmButtonText: "Crear",
-                cancelButtonText: "Cancelar",
-            }).then((result2) => {
-                if (!result2.isConfirmed) return;
-                const porcentajeParticipacionUtilidades = parseFloat(result2.value || "0");
-                const edgeId = `edge${nextEdgeIndex.value}`;
-                const edgeColor = "#002C48";
-                edges[edgeId] = {
-                    source,
-                    target,
-                    color: edgeColor,
-                    porcentajeParticipacion,
-                    porcentajeParticipacionUtilidades,
-                };
-                nextEdgeIndex.value++;
-                Swal.fire({
-                    icon: "success",
-                    title: "¡Arista creada!",
-                    text: "La arista ha sido creada exitosamente.",
-                    iconColor: "#20c997",
-                    background: "#FFFFFF",
-                    confirmButtonText: "Cerrar",
-                });
-            });
-        });
-    }
-
-    function removeEdge() {
-        for (const edgeId of selectedEdges.value) {
-            delete edges[edgeId];
-        }
-        selectedEdges.value = [];
-    }
-    function updateNodeName() {
-        if (selectedNodes.value.length === 1) {
-            const nodeId = selectedNodes.value[0];
-            nodes[nodeId].name = newNodeName.value;
-            newNodeName.value = "";
-        } else {
-            alert("Por favor selecciona un único nodo para renombrarlo.");
-        }
-    }
-
-    // --- 12. Persistencia y restauración del grafo completo ---
-    function saveNodes() {
-        const cleanNodes = {};
-        for (const k in nodes) {
-            if (nodes[k]) cleanNodes[k] = nodes[k];
-        }
-        const cleanEdges = {};
-        for (const k in edges) {
-            if (edges[k]) cleanEdges[k] = edges[k];
-        }
-        const currentGraphState = {
-            nodes: cleanNodes,
-            edges: cleanEdges,
-            nextNodeIndex: nextNodeIndex.value,
-            nextEdgeIndex: nextEdgeIndex.value,
-        };
-        localStorage.setItem("savedGraphState", JSON.stringify(currentGraphState));
-        Swal.fire({
-            target: "#graph-container",
-            icon: "success",
-            title: "¡Esquema guardado!",
-            text: "Nodos y aristas guardados correctamente.",
-            iconColor: "#20c997",
-            background: "#FFFFFF",
-            showConfirmButton: false,
-            timer: 1200,
-            timerProgressBar: true,
-            customClass: {
-                popup: "sii-swal-popup",
-                header: "sii-swal-header-info",
-                icon: "sii-swal-icon",
-                title: "sii-swal-title",
-                confirmButton: "sii-swal-confirm-btn",
-                closeButton: "sii-swal-close-btn",
-            } as any,
-        });
-    }
-    function loadNodes() {
-        const savedGraphState = localStorage.getItem("savedGraphState");
-        if (savedGraphState) {
-            const {
-                nodes: savedNodes,
-                edges: savedEdges,
-                nextNodeIndex: savedNodeIndex,
-                nextEdgeIndex: savedEdgeIndex,
-            } = JSON.parse(savedGraphState);
-            Object.keys(nodes).forEach((k) => delete nodes[k]);
-            Object.keys(edges).forEach((k) => delete edges[k]);
-            for (const nodeId in savedNodes) {
-                nodes[nodeId] = { ...savedNodes[nodeId] };
-            }
-            for (const edgeId in savedEdges) {
-                edges[edgeId] = { ...savedEdges[edgeId] };
-            }
-            nextNodeIndex.value = savedNodeIndex;
-            nextEdgeIndex.value = savedEdgeIndex;
-        }
-    }
+    // --- Fullscreen toggle ---
     function toggleFullscreen() {
         document.querySelectorAll(".tooltip.show").forEach((t) => t.classList.remove("show"));
         if (!document.fullscreenElement) {
@@ -614,17 +222,15 @@
             document.exitFullscreen?.();
         }
     }
+
+    // --- Selección reactiva de nodos (para box selection) ---
     function onSelectedNodesUpdate(newSelection: string[]) {
-        if (isBoxSelectionMode.value && newSelection.length === 0) {
-            return;
-        }
+        if (isBoxSelectionMode.value && newSelection.length === 0) return;
         selectedNodes.value = newSelection;
-        if (isBoxSelectionMode.value) {
-            updateSelectionTooltips();
-        }
+        if (isBoxSelectionMode.value) updateSelectionTooltips();
     }
 
-    // --- 13. Export SVG ---
+    // --- Exportar SVG ---
     async function downloadAsSvg() {
         if (!graph.value) return;
         try {
@@ -647,12 +253,12 @@
 <template>
     <div class="container">
         <!-- Panel de Acciones -->
-
         <div
             id="graph-container"
             class="network-graph-container bg-light rounded shadow-sm p-3"
             ref="graphContainer">
             <div class="d-flex justify-content-end flex-column align-items-end">
+                <!-- Botón fullscreen -->
                 <div
                     class="fullscreen-wrapper"
                     aria-label="Agrandar imagen"
@@ -661,10 +267,9 @@
                     <span class="fullscreen-text">Ver más grande</span>
                     <i
                         class="bi bi-arrows-fullscreen text-white"
-                        style="font-size: 14px; cursor: pointer">
-                    </i>
+                        style="font-size: 14px; cursor: pointer"></i>
                 </div>
-
+                <!-- D3-Force -->
                 <div
                     class="fullscreen-wrapper mt-4 mt-smaller d-flex align-items-center justify-content-between"
                     aria-label="Ordenar Esquema"
@@ -694,11 +299,11 @@
                                 top: 1px;
                                 left: -7px;
                             " />
-                        <label class="form-check-label visually-hidden" for="d3ForceCheck"> </label>
+                        <label class="form-check-label visually-hidden" for="d3ForceCheck"></label>
                     </div>
                 </div>
             </div>
-            <!-- Toolbar estilo Photoshop -->
+            <!-- Toolbar Nodos -->
             <div
                 class="toolbar d-flex gap-2 flex-column position-absolute"
                 style="top: 10px; left: 10px; z-index: 2000">
@@ -716,7 +321,6 @@
                     @click="handleRemoveNode">
                     <i class="bi bi-trash-fill text-black fs-6"></i>
                 </button>
-
                 <button
                     class="btn btn-light btn-sm"
                     data-bs-toggle="tooltip"
@@ -725,6 +329,7 @@
                     <i class="bi bi-plus-circle-fill text-black fs-6"></i>
                 </button>
             </div>
+            <!-- Toolbar Aristas -->
             <div
                 class="toolbar d-flex gap-2 flex-column position-absolute"
                 style="top: 145px; left: 10px; z-index: 2000">
@@ -734,8 +339,6 @@
                     title="Gestión de Aristas">
                     <i class="bi bi-arrow-left-right"></i>
                 </button>
-
-                <!-- Eliminar Arista -->
                 <button
                     ref="deleteEdgeBtn"
                     class="btn btn-light btn-sm"
@@ -744,7 +347,6 @@
                     @click="handleRemoveEdge">
                     <i class="bi bi-trash3-fill text-black fs-6"></i>
                 </button>
-                <!-- Crear Arista -->
                 <button
                     ref="createEdgeBtn"
                     class="btn btn-light btn-sm"
@@ -754,7 +356,7 @@
                     <i class="bi bi-plus-circle-fill text-black fs-6"></i>
                 </button>
             </div>
-
+            <!-- Toolbar Grupos -->
             <div
                 class="toolbar d-flex gap-2 flex-column position-absolute"
                 style="top: 280px; left: 10px; z-index: 2000">
@@ -779,7 +381,7 @@
                         ]"></i>
                 </button>
             </div>
-            <!-- Selección por Grupo de Nodo -->
+            <!-- Toolbar selección grupo nodos -->
             <div
                 class="toolbar d-flex gap-2 flex-column position-absolute"
                 style="top: 358px; left: 10px; z-index: 2000">
@@ -793,7 +395,6 @@
                         title="Selección por Grupo de Nodos">
                         <i class="bi bi-check-circle fs-6"></i>
                     </button>
-
                     <div>
                         <ExcelExportButton
                             class="btn btn-light btn-sm demos"
@@ -806,7 +407,7 @@
                     </div>
                 </div>
             </div>
-            <!-- Descargar SVG -->
+            <!-- Toolbar Descargar SVG -->
             <div
                 class="toolbar d-flex gap-2 flex-column position-absolute"
                 style="top: 420px; left: 10px; z-index: 2000">
@@ -818,11 +419,12 @@
                     <i class="bi bi-file-earmark-arrow-down text-primary fs-6"></i>
                 </button>
             </div>
-            <!-- Botón fijo en esquina inferior derecha dentro del grafo -->
+            <!-- Botón fijo Guardar -->
             <button class="btn btn-success btn-sm px-3 save-btn-bottom-right" @click="saveNodes">
                 <i class="fas fa-save me-1"></i> Guardar Esquema
             </button>
 
+            <!-- v-network-graph principal -->
             <v-network-graph
                 :selected-nodes="selectedNodes"
                 @update:selected-nodes="onSelectedNodesUpdate"
@@ -842,7 +444,6 @@
                         format('woff2'); }
                     </component>
                 </defs>
-
                 <template #override-node="{ nodeId, scale, config, ...slotProps }">
                     <circle :r="config.radius * scale" :fill="config.color" v-bind="slotProps" />
                     <text
@@ -856,7 +457,7 @@
                 </template>
             </v-network-graph>
 
-            <!-- tooltips persistentes para los nodos seleccionados -->
+            <!-- Tooltips selección múltiple -->
             <div v-if="isBoxSelectionMode">
                 <div
                     v-for="tip in selectionTooltips"
@@ -872,10 +473,8 @@
                     <div v-if="tip.data.lineaNegocio">
                         <strong>Línea de Negocio:</strong> {{ tip.data.lineaNegocio }}
                     </div>
-                    <!-- <div><strong>Posición:</strong> ({{ tip.data.x }}, {{ tip.data.y }})</div> -->
                 </div>
             </div>
-
             <div v-if="isBoxSelectionMode" class="mode-indicator">Modo selección por caja</div>
 
             <!-- Tooltip Nodos -->
@@ -883,7 +482,6 @@
                 <button class="close-btn" @click="closeTooltip('node')">×</button>
                 <div class="d-flex align-items-center">
                     <strong>Nombre:</strong> {{ tooltipData.name }}
-                    <!-- 🟢 Botón Editar Nodo -->
                     <button
                         class="btn btn-link btn-sm p-0 ms-2"
                         style="color: #0f69b4"
@@ -905,8 +503,7 @@
                 </div>
             </div>
 
-            <!-- Modal de edición de nodo (justo después del NodeModal) -->
-            <!-- 👇 Solo si el modal está visible se pasa la prop -->
+            <!-- Modal de edición de nodo -->
             <EditNodeModal
                 v-if="showEditNodeModal"
                 :show="showEditNodeModal"
